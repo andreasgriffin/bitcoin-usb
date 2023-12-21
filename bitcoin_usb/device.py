@@ -101,7 +101,9 @@ class Device:
             return self.client.display_multisig_address(
                 get_hwi_address_type(desc_infos.address_type),
                 HWIMultisigDescriptor(
-                    pubkey_providers, thresh=desc_infos.threshold, is_sorted=True
+                    pubkeys=pubkey_providers,
+                    thresh=desc_infos.threshold,
+                    is_sorted=True,
                 ),
             )
         else:

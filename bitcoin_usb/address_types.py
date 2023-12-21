@@ -65,7 +65,7 @@ class AddressType:
     def get_bip32_path(
         self, network: bdk.Network, keychain: bdk.KeychainKind, address_index: int
     ) -> str:
-        return f"{self.key_origin(network)}/{0 if keychain == bdk.KeychainKind.EXTERNAL else 1}/{address_index}"
+        return f"m/{0 if keychain == bdk.KeychainKind.EXTERNAL else 1}/{address_index}"
 
 
 class AddressTypes:
@@ -141,7 +141,7 @@ def get_hwi_address_type(address_type: AddressType) -> HWIAddressType:
     # see https://hwi.readthedocs.io/en/latest/usage/api-usage.html#hwilib.common.AddressType
     if address_type.name in [AddressTypes.p2pkh.name]:
         return HWIAddressType.LEGACY
-    if address_type.name in [AddressTypes.p2wpkh.name]:
+    if address_type.name in [AddressTypes.p2wpkh.name, AddressTypes.p2wsh.name]:
         return HWIAddressType.WIT
     if address_type.name in [
         AddressTypes.p2sh_p2wpkh.name,
@@ -150,6 +150,8 @@ def get_hwi_address_type(address_type: AddressType) -> HWIAddressType:
         return HWIAddressType.SH_WIT
     if address_type.name in [AddressTypes.p2tr.name]:
         return HWIAddressType.TAP
+
+    raise ValueError(f"No HWI AddressType could be found for {address_type.name}")
 
 
 class SignerInfo:
@@ -170,7 +172,7 @@ class SignerInfo:
         self.derivation_path = derivation_path
 
     @classmethod
-    def from_hwi(pubkey_provider: PubkeyProvider) -> "SignerInfo":
+    def from_hwi(cls, pubkey_provider: PubkeyProvider) -> "SignerInfo":
         return SignerInfo(
             xpub=pubkey_provider.pubkey,
             fingerprint=pubkey_provider.origin.fingerprint.hex(),
@@ -179,9 +181,13 @@ class SignerInfo:
         )
 
     def to_hwi_pubkey_provider(self) -> PubkeyProvider:
-        hwi_key_origin = self.key_origin.replace("m/", f"{self.fingerprint}/")
+
         provider = PubkeyProvider(
-            origin=hwi_key_origin, pubkey=self.xpub, deriv_path=self.derivation_path
+            origin=KeyOriginInfo.from_string(
+                self.key_origin.replace("m/", f"{self.fingerprint}/")
+            ),
+            pubkey=self.xpub,
+            deriv_path=self.derivation_path,
         )
         return provider
 
@@ -216,10 +222,11 @@ class DescriptorInfo:
         self.signer_infos = signer_infos
         self.threshold = threshold
 
+    def __repr__(self) -> str:
+        return f"{self.__dict__}"
+
 
 def public_descriptor_info(descriptor_str: str) -> DescriptorInfo:
-    "gets the xpub (not xpriv) information"
-
     hwi_descriptor = parse_descriptor(descriptor_str)
 
     # first we need to identify the address type
@@ -237,13 +244,16 @@ def public_descriptor_info(descriptor_str: str) -> DescriptorInfo:
     for descritptor_class in address_type.hwi_descriptor_classes:
         # just double checking that _find_matching_address_type did its job correctly
         assert isinstance(subdescriptor, descritptor_class)
-        subdescriptor = subdescriptor.subdescriptors[0]
-
-        if descritptor_class == MultisigDescriptor:
-            # last descriptor is a multisig
-            threshold = subdescriptor.thresh
+        subdescriptor = (
+            subdescriptor.subdescriptors[0]
+            if subdescriptor.subdescriptors
+            else subdescriptor
+        )
 
     pubkey_providers = subdescriptor.pubkeys
+    if isinstance(subdescriptor, MultisigDescriptor):
+        # last descriptor is a multisig
+        threshold = subdescriptor.thresh
 
     return DescriptorInfo(
         address_type=address_type,
