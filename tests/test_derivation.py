@@ -20,7 +20,7 @@ def test_compare_single_sig_key_derivation_with_bdk_templates():
         "debris yellow child maze hen lamp law venue pluck ketchup melody sick",
     ]:
 
-        for address_type in get_address_types():
+        for address_type in get_all_address_types():
             if address_type.is_multisig:
                 # no gtest possible yet here, because no bdk_template exists
                 continue

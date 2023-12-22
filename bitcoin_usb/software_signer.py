@@ -16,7 +16,7 @@ from .address_types import (
     SimplePubKeyProvider,
     AddressTypes,
     AddressType,
-    get_address_types,
+    get_all_address_types,
 )
 from .seed_tools import derive, derive_spk_provider, get_bip32_ext_private_key
 from .device import BaseDevice
@@ -35,7 +35,7 @@ class SoftwareSigner(BaseDevice):
 
     def get_xpubs(self) -> Dict[AddressTypes, str]:
         xpubs = {}
-        for address_type in get_address_types():
+        for address_type in get_all_address_types():
             xpub, fingerprint = derive(
                 self.mnemonic, address_type.key_origin, self.network
             )

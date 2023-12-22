@@ -139,8 +139,12 @@ def get_address_type_dicts() -> Dict[str, AddressType]:
     return {k: v for k, v in AddressTypes.__dict__.items() if (not k.startswith("_"))}
 
 
-def get_address_types() -> List[AddressType]:
+def get_all_address_types() -> List[AddressType]:
     return get_address_type_dicts().values()
+
+
+def get_address_types(is_multisig: bool) -> List[AddressType]:
+    return [a for a in get_all_address_types() if a.is_multisig == is_multisig]
 
 
 def get_hwi_address_type(address_type: AddressType) -> HWIAddressType:
@@ -263,7 +267,7 @@ class DescriptorInfo:
         # check that the key_origins of the spk_providers are matching the desired output address_type
         common_key_origins = [
             address_type.key_origin(network)
-            for address_type in get_address_types()
+            for address_type in get_all_address_types()
             if address_type.is_multisig
         ]
         for spk_provider in self.spk_providers:
@@ -304,7 +308,7 @@ class DescriptorInfo:
 
         # first we need to identify the address type
         address_type = _find_matching_address_type(
-            _get_descriptor_instances(hwi_descriptor), get_address_types()
+            _get_descriptor_instances(hwi_descriptor), get_all_address_types()
         )
         if not address_type:
             raise ValueError(

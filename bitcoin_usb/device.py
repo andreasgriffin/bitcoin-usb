@@ -17,7 +17,7 @@ from .address_types import (
     AddressTypes,
     DescriptorInfo,
     SimplePubKeyProvider,
-    get_address_types,
+    get_all_address_types,
     get_hwi_address_type,
 )
 from hwilib.descriptor import MultisigDescriptor as HWIMultisigDescriptor
@@ -90,7 +90,7 @@ class USBDevice(BaseDevice):
 
     def get_xpubs(self) -> Dict[AddressTypes, str]:
         xpubs = {}
-        for address_type in get_address_types():
+        for address_type in get_all_address_types():
             xpubs[address_type] = self.client.get_pubkey_at_path(
                 address_type.key_origin(self.network)
             ).to_string()
