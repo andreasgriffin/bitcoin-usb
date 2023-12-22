@@ -5,12 +5,26 @@
   * Coldcard
 
 
+* It also provides 
+  * AddressTypes, which are the commonly used bitcoin output descriptor templates
+  * seed_tools.derive_spk_provider  to derive xpubs from seeds for all AddressTypes  (bdk does not support multisig templates currently https://github.com/bitcoindevkit/bdk/issues/1020)
+
+
 ### Demo
 
 Run the demo with
 
 ```
 python demo.py
+```
+
+
+### Tests
+
+Run tests
+
+```
+python -m pytest -vvv  --log-cli-level=0
 ```
 
 
@@ -31,7 +45,7 @@ pip install bitcoin_usb
 
 ```shell
 python setup.py sdist bdist_wheel
-pip install dist/bitcoin_qrreader*.whl  
+pip install .
 ```
 
 
