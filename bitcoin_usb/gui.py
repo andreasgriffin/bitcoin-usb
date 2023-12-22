@@ -11,7 +11,7 @@ from PySide2.QtWidgets import (
     QTabWidget,
 )
 import hwilib.commands as hwi_commands
-from .device import Device
+from .device import USBDevice
 import bdkpython as bdk
 from PySide2.QtWidgets import (
     QApplication,
@@ -116,7 +116,7 @@ class MainWindow(QMainWindow):
         self.psbt_text_edit.setText("")
         selected_device = self.get_device()
         if selected_device:
-            with Device(selected_device, self.network) as dev:
+            with USBDevice(selected_device, self.network) as dev:
                 signed_psbt = dev.sign_psbt(psbt)
                 self.psbt_text_edit.setText(signed_psbt.serialize())
 
@@ -128,7 +128,7 @@ class MainWindow(QMainWindow):
 
     def display_xpubs(self, device):
         txt = ""
-        with Device(device, self.network) as dev:
+        with USBDevice(device, self.network) as dev:
             xpubs = dev.get_xpubs()
             txt += "\n".join(
                 [

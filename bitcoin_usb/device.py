@@ -15,14 +15,14 @@ from typing import *
 from .address_types import (
     AddressType,
     AddressTypes,
-    SignerInfo,
+    SimplePubKeyProvider,
     get_hwi_address_type,
-    public_descriptor_info,
+    get_public_descriptor_info,
 )
 from hwilib.descriptor import MultisigDescriptor as HWIMultisigDescriptor
 
 
-class Device:
+class USBDevice:
     def __init__(self, enumerate_device: List[Dict[str, Any]], network: bdk.Network):
         self.network = network
         self.enumerate_device = enumerate_device
@@ -91,12 +91,12 @@ class Device:
         address_index: int,
         network: bdk.Network,
     ) -> str:
-        desc_infos = public_descriptor_info(descriptor_str)
+        desc_infos = get_public_descriptor_info(descriptor_str)
 
         if desc_infos.address_type.is_multisig:
             pubkey_providers = [
                 signer_info.to_hwi_pubkey_provider()
-                for signer_info in desc_infos.signer_infos
+                for signer_info in desc_infos.spk_provider
             ]
             return self.client.display_multisig_address(
                 get_hwi_address_type(desc_infos.address_type),

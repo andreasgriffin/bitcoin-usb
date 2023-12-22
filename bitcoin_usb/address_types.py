@@ -154,26 +154,40 @@ def get_hwi_address_type(address_type: AddressType) -> HWIAddressType:
     raise ValueError(f"No HWI AddressType could be found for {address_type.name}")
 
 
-class SignerInfo:
+class SimplePubKeyProvider:
     def __init__(
         self,
         xpub: str,
         fingerprint: str,
         key_origin: str,
-        derivation_path: str,
+        derivation_path: str = "/0/*",
     ) -> None:
         self.xpub = xpub
         self.fingerprint = fingerprint
         # key_origin example: "m/84h/1h/0h"
         assert key_origin.startswith("m/")
-        self.key_origin = key_origin
+        self.key_origin = key_origin.replace("'", "h")
         # derivation_path example "/0/*"
         assert derivation_path.startswith("/")
         self.derivation_path = derivation_path
 
+    def is_testnet(self):
+        network_str = int(self.key_origin.split("/")[2])
+        assert network_str.endswith("h")
+        network_index = int(network_str.replace("h", ""))
+        if network_index == 0:
+            return False
+        elif network_index == 1:
+            return True
+        else:
+            # https://learnmeabitcoin.com/technical/derivation-paths
+            raise ValueError(
+                f"Unknown network/coin type {network_str} in {self.key_origin}"
+            )
+
     @classmethod
-    def from_hwi(cls, pubkey_provider: PubkeyProvider) -> "SignerInfo":
-        return SignerInfo(
+    def from_hwi(cls, pubkey_provider: PubkeyProvider) -> "SimplePubKeyProvider":
+        return SimplePubKeyProvider(
             xpub=pubkey_provider.pubkey,
             fingerprint=pubkey_provider.origin.fingerprint.hex(),
             key_origin=pubkey_provider.origin.get_derivation_path(),
@@ -190,6 +204,9 @@ class SignerInfo:
             deriv_path=self.derivation_path,
         )
         return provider
+
+    def __repr__(self) -> str:
+        return f"{self.__class__.__name__}({self.__dict__})"
 
 
 def _get_descriptor_instances(descriptor):
@@ -216,17 +233,20 @@ def _find_matching_address_type(instance_tuple, address_types: List[AddressType]
 
 class DescriptorInfo:
     def __init__(
-        self, address_type: AddressType, signer_infos: List[SignerInfo], threshold=1
+        self,
+        address_type: AddressType,
+        spk_provider: List[SimplePubKeyProvider],
+        threshold=1,
     ) -> None:
         self.address_type = address_type
-        self.signer_infos = signer_infos
+        self.spk_provider = spk_provider
         self.threshold = threshold
 
     def __repr__(self) -> str:
         return f"{self.__dict__}"
 
 
-def public_descriptor_info(descriptor_str: str) -> DescriptorInfo:
+def get_public_descriptor_info(descriptor_str: str) -> DescriptorInfo:
     hwi_descriptor = parse_descriptor(descriptor_str)
 
     # first we need to identify the address type
@@ -257,40 +277,49 @@ def public_descriptor_info(descriptor_str: str) -> DescriptorInfo:
 
     return DescriptorInfo(
         address_type=address_type,
-        signer_infos=[
-            SignerInfo.from_hwi(pubkey_provider) for pubkey_provider in pubkey_providers
+        spk_provider=[
+            SimplePubKeyProvider.from_hwi(pubkey_provider)
+            for pubkey_provider in pubkey_providers
         ],
         threshold=threshold,
     )
 
 
 def make_multisig_descriptor(
-    address_type: AddressType, threshold: int, descriptors: List[bdk.Descriptor]
+    output_address_type: AddressType,
+    threshold: int,
+    spk_providers: List[SimplePubKeyProvider],
+    network: bdk.Network,
 ) -> bdk.Descriptor:
     "Takes in single sig descriptors and creates a multisig descritpr out of it"
 
-    assert address_type.is_multisig
-    assert descriptors
+    assert output_address_type.is_multisig
 
-    # check all descriptors have the same network
-    assert all(
-        [descriptor.network == descriptors[0].network for descriptor in descriptors]
-    ), "Descriptors with different networks given"
+    # check that the key_origins of the spk_providers are matching the desired output address_type
+    allowed_key_origins = [
+        address_type.key_origin(network)
+        for address_type in get_address_types()
+        if address_type.is_multisig
+    ]
+    for spk_provider in spk_providers:
+        if spk_provider.key_origin not in allowed_key_origins:
+            logger.warning(
+                f"{spk_provider.key_origin } is not a common multisig key_origin!"
+            )
 
-    hwi_pubkey_providers = []
-    for descriptor in descriptors:
-        hwi_pubkey_provider = _descriptor_to_hwi_pubkey_providers(
-            descriptor.as_string_private()
-        )
-        if not hwi_pubkey_provider or len(hwi_pubkey_provider) >= 2:
-            # cannot handle. The argument descriptors are only singlesig descriptors
-            return
-        hwi_pubkey_providers.append(hwi_pubkey_provider[0])
+    hwi_pubkey_providers = [
+        spk_provider.to_hwi_pubkey_provider() for spk_provider in spk_providers
+    ]
 
-    multisig_hwi_descriptor = address_type.hwi_descriptor_classes(
+    # build the inner most multisig descriptor
+    assert output_address_type.hwi_descriptor_classes[-1] == MultisigDescriptor
+    hwi_descriptor = MultisigDescriptor(
         pubkeys=hwi_pubkey_providers, thresh=threshold, is_sorted=True
     )
+    # now allply the remaining hwi_descriptor_classes
+    for hwi_descriptor_class in reversed(
+        output_address_type.hwi_descriptor_classes[:-1]
+    ):
+        hwi_descriptor = hwi_descriptor_class(hwi_descriptor)
 
-    return bdk.Descriptor(
-        multisig_hwi_descriptor.to_string(), network=descriptors[0].network
-    )
+    return bdk.Descriptor(hwi_descriptor.to_string(), network=network)
