@@ -235,15 +235,57 @@ class DescriptorInfo:
     def __init__(
         self,
         address_type: AddressType,
-        spk_provider: List[SimplePubKeyProvider],
+        spk_providers: List[SimplePubKeyProvider],
         threshold=1,
     ) -> None:
         self.address_type = address_type
-        self.spk_provider = spk_provider
+        self.spk_providers = spk_providers
         self.threshold = threshold
+
+        if not self.address_type.is_multisig:
+            assert len(spk_providers) <= 1
 
     def __repr__(self) -> str:
         return f"{self.__dict__}"
+
+    def get_hwi_descriptor(self, network: bdk.Network):
+        # check that the key_origins of the spk_providers are matching the desired output address_type
+        common_key_origins = [
+            address_type.key_origin(network)
+            for address_type in get_address_types()
+            if address_type.is_multisig
+        ]
+        for spk_provider in self.spk_providers:
+            if spk_provider.key_origin not in common_key_origins:
+                logger.warning(
+                    f"{spk_provider.key_origin } is not a common multisig key_origin!"
+                )
+
+        if self.address_type.is_multisig:
+            assert self.address_type.hwi_descriptor_classes[-1] == MultisigDescriptor
+            hwi_descriptor = MultisigDescriptor(
+                pubkeys=[
+                    provider.to_hwi_pubkey_provider() for provider in self.spk_providers
+                ],
+                thresh=self.threshold,
+                is_sorted=True,
+            )
+        else:
+            hwi_descriptor = self.address_type.hwi_descriptor_classes[-1](
+                self.spk_providers[0].to_hwi_pubkey_provider()
+            )
+
+        for hwi_descriptor_class in reversed(
+            self.address_type.hwi_descriptor_classes[:-1]
+        ):
+            hwi_descriptor = hwi_descriptor_class(hwi_descriptor)
+
+        return hwi_descriptor
+
+    def get_bdk_descriptor(self, network: bdk.Network):
+        return bdk.Descriptor(
+            self.get_hwi_descriptor(network).to_string(), network=network
+        )
 
 
 def get_public_descriptor_info(descriptor_str: str) -> DescriptorInfo:
@@ -277,49 +319,9 @@ def get_public_descriptor_info(descriptor_str: str) -> DescriptorInfo:
 
     return DescriptorInfo(
         address_type=address_type,
-        spk_provider=[
+        spk_providers=[
             SimplePubKeyProvider.from_hwi(pubkey_provider)
             for pubkey_provider in pubkey_providers
         ],
         threshold=threshold,
     )
-
-
-def make_multisig_descriptor(
-    output_address_type: AddressType,
-    threshold: int,
-    spk_providers: List[SimplePubKeyProvider],
-    network: bdk.Network,
-) -> bdk.Descriptor:
-    "Takes in single sig descriptors and creates a multisig descritpr out of it"
-
-    assert output_address_type.is_multisig
-
-    # check that the key_origins of the spk_providers are matching the desired output address_type
-    allowed_key_origins = [
-        address_type.key_origin(network)
-        for address_type in get_address_types()
-        if address_type.is_multisig
-    ]
-    for spk_provider in spk_providers:
-        if spk_provider.key_origin not in allowed_key_origins:
-            logger.warning(
-                f"{spk_provider.key_origin } is not a common multisig key_origin!"
-            )
-
-    hwi_pubkey_providers = [
-        spk_provider.to_hwi_pubkey_provider() for spk_provider in spk_providers
-    ]
-
-    # build the inner most multisig descriptor
-    assert output_address_type.hwi_descriptor_classes[-1] == MultisigDescriptor
-    hwi_descriptor = MultisigDescriptor(
-        pubkeys=hwi_pubkey_providers, thresh=threshold, is_sorted=True
-    )
-    # now allply the remaining hwi_descriptor_classes
-    for hwi_descriptor_class in reversed(
-        output_address_type.hwi_descriptor_classes[:-1]
-    ):
-        hwi_descriptor = hwi_descriptor_class(hwi_descriptor)
-
-    return bdk.Descriptor(hwi_descriptor.to_string(), network=network)

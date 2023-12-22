@@ -37,11 +37,14 @@ def test_compare_single_sig_key_derivation_with_bdk_templates():
                 test_seed, address_type.key_origin(network), network
             )
 
-            hwi_descriptor = spk_provider.to_hwi_pubkey_provider()
-            for hwi_descriptor_class in reversed(address_type.hwi_descriptor_classes):
-                hwi_descriptor = hwi_descriptor_class(hwi_descriptor)
-            logger.info(descriptor.as_string())
-            assert descriptor.as_string() == hwi_descriptor.to_string(hardened_char="'")
+            desc_info = DescriptorInfo(address_type, [spk_provider])
+            assert descriptor.as_string() == desc_info.get_hwi_descriptor(
+                network
+            ).to_string(hardened_char="'")
+            assert (
+                descriptor.as_string()
+                == desc_info.get_bdk_descriptor(network).as_string()
+            )
 
 
 def test_correct_p2sh_p2wsh_derivation():
@@ -122,7 +125,9 @@ def test_multisig():
             network,
         ),
     ]
-    descriptor = make_multisig_descriptor(AddressTypes.p2wsh, 2, spk_providers, network)
+    descriptor = DescriptorInfo(
+        AddressTypes.p2wsh, spk_providers, 2
+    ).get_bdk_descriptor(network)
     stripped = descriptor.as_string().split("#")[0].replace("'", "h")
     # comparision created with sparrow (had to reorder the pubkey_providers)
     assert (
@@ -150,7 +155,9 @@ def test_multisig_unusual_key_origin(caplog):
             network,
         ),
     ]
-    descriptor = make_multisig_descriptor(AddressTypes.p2wsh, 2, spk_providers, network)
+    descriptor = DescriptorInfo(
+        AddressTypes.p2wsh, spk_providers, 2
+    ).get_bdk_descriptor(network)
     stripped = descriptor.as_string().split("#")[0].replace("'", "h")
     # comparision created with sparrow (had to reorder the pubkey_providers)
     assert (
