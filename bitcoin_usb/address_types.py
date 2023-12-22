@@ -20,6 +20,12 @@ from hwilib.key import KeyOriginInfo, HARDENED_FLAG
 from hwilib.common import AddressType as HWIAddressType
 
 
+class ConstDerivationPaths:
+    receive = "/0/*"
+    change = "/1/*"
+    multipath = "/<0;1>/*"
+
+
 # https://bitcoin.design/guide/glossary/address/
 # https://learnmeabitcoin.com/technical/derivation-paths
 # https://github.com/bitcoin/bips/blob/master/bip-0380.mediawiki
@@ -160,7 +166,7 @@ class SimplePubKeyProvider:
         xpub: str,
         fingerprint: str,
         key_origin: str,
-        derivation_path: str = "/0/*",
+        derivation_path: str = ConstDerivationPaths.receive,
     ) -> None:
         self.xpub = xpub
         self.fingerprint = fingerprint
@@ -171,8 +177,13 @@ class SimplePubKeyProvider:
         assert derivation_path.startswith("/")
         self.derivation_path = derivation_path
 
+    def clone(self) -> "SimplePubKeyProvider":
+        return SimplePubKeyProvider(
+            self.xpub, self.fingerprint, self.key_origin, self.derivation_path
+        )
+
     def is_testnet(self):
-        network_str = int(self.key_origin.split("/")[2])
+        network_str = self.key_origin.split("/")[2]
         assert network_str.endswith("h")
         network_index = int(network_str.replace("h", ""))
         if network_index == 0:
@@ -238,9 +249,9 @@ class DescriptorInfo:
         spk_providers: List[SimplePubKeyProvider],
         threshold=1,
     ) -> None:
-        self.address_type = address_type
-        self.spk_providers = spk_providers
-        self.threshold = threshold
+        self.address_type: AddressType = address_type
+        self.spk_providers: List[SimplePubKeyProvider] = spk_providers
+        self.threshold: int = threshold
 
         if not self.address_type.is_multisig:
             assert len(spk_providers) <= 1
@@ -287,41 +298,41 @@ class DescriptorInfo:
             self.get_hwi_descriptor(network).to_string(), network=network
         )
 
+    @classmethod
+    def from_str(cls, descriptor_str: str) -> "DescriptorInfo":
+        hwi_descriptor = parse_descriptor(descriptor_str)
 
-def get_public_descriptor_info(descriptor_str: str) -> DescriptorInfo:
-    hwi_descriptor = parse_descriptor(descriptor_str)
-
-    # first we need to identify the address type
-    address_type = _find_matching_address_type(
-        _get_descriptor_instances(hwi_descriptor), get_address_types()
-    )
-    if not address_type:
-        raise ValueError(
-            f"descriptor {descriptor_str} cannot be matched to known template"
+        # first we need to identify the address type
+        address_type = _find_matching_address_type(
+            _get_descriptor_instances(hwi_descriptor), get_address_types()
         )
+        if not address_type:
+            raise ValueError(
+                f"descriptor {descriptor_str} cannot be matched to known template"
+            )
 
-    # get the     pubkey_providers, by "walking to the end of desciptors"
-    threshold = 1
-    subdescriptor = hwi_descriptor
-    for descritptor_class in address_type.hwi_descriptor_classes:
-        # just double checking that _find_matching_address_type did its job correctly
-        assert isinstance(subdescriptor, descritptor_class)
-        subdescriptor = (
-            subdescriptor.subdescriptors[0]
-            if subdescriptor.subdescriptors
-            else subdescriptor
+        # get the     pubkey_providers, by "walking to the end of desciptors"
+        threshold = 1
+        subdescriptor = hwi_descriptor
+        for descritptor_class in address_type.hwi_descriptor_classes:
+            # just double checking that _find_matching_address_type did its job correctly
+            assert isinstance(subdescriptor, descritptor_class)
+            subdescriptor = (
+                subdescriptor.subdescriptors[0]
+                if subdescriptor.subdescriptors
+                else subdescriptor
+            )
+
+        pubkey_providers = subdescriptor.pubkeys
+        if isinstance(subdescriptor, MultisigDescriptor):
+            # last descriptor is a multisig
+            threshold = subdescriptor.thresh
+
+        return DescriptorInfo(
+            address_type=address_type,
+            spk_providers=[
+                SimplePubKeyProvider.from_hwi(pubkey_provider)
+                for pubkey_provider in pubkey_providers
+            ],
+            threshold=threshold,
         )
-
-    pubkey_providers = subdescriptor.pubkeys
-    if isinstance(subdescriptor, MultisigDescriptor):
-        # last descriptor is a multisig
-        threshold = subdescriptor.thresh
-
-    return DescriptorInfo(
-        address_type=address_type,
-        spk_providers=[
-            SimplePubKeyProvider.from_hwi(pubkey_provider)
-            for pubkey_provider in pubkey_providers
-        ],
-        threshold=threshold,
-    )

@@ -15,16 +15,45 @@ from typing import *
 from .address_types import (
     AddressType,
     AddressTypes,
+    DescriptorInfo,
     SimplePubKeyProvider,
+    get_address_types,
     get_hwi_address_type,
-    get_public_descriptor_info,
 )
 from hwilib.descriptor import MultisigDescriptor as HWIMultisigDescriptor
 
 
-class USBDevice:
-    def __init__(self, enumerate_device: List[Dict[str, Any]], network: bdk.Network):
+class BaseDevice:
+    def __init__(self, network: bdk.Network) -> None:
         self.network = network
+
+    def get_fingerprint(self) -> str:
+        pass
+
+    def get_xpubs(self) -> Dict[AddressTypes, str]:
+        pass
+
+    def sign_psbt(
+        self, psbt: bdk.PartiallySignedTransaction
+    ) -> bdk.PartiallySignedTransaction:
+        pass
+
+    def sign_message(self, message: str, bip32_path: str) -> str:
+        pass
+
+    def display_address(
+        self,
+        descriptor_str: str,
+        keychain: bdk.KeychainKind,
+        address_index: int,
+        network: bdk.Network,
+    ) -> str:
+        pass
+
+
+class USBDevice(BaseDevice):
+    def __init__(self, enumerate_device: List[Dict[str, Any]], network: bdk.Network):
+        super().__init__(network=network)
         self.enumerate_device = enumerate_device
         self.lock = threading.Lock()
         self.client = None
@@ -61,10 +90,7 @@ class USBDevice:
 
     def get_xpubs(self) -> Dict[AddressTypes, str]:
         xpubs = {}
-        for s in vars(AddressTypes):
-            if s.startswith("_"):
-                continue
-            address_type = getattr(AddressTypes, s)
+        for address_type in get_address_types():
             xpubs[address_type] = self.client.get_pubkey_at_path(
                 address_type.key_origin(self.network)
             ).to_string()
@@ -91,7 +117,7 @@ class USBDevice:
         address_index: int,
         network: bdk.Network,
     ) -> str:
-        desc_infos = get_public_descriptor_info(descriptor_str)
+        desc_infos = DescriptorInfo.from_str(descriptor_str)
 
         if desc_infos.address_type.is_multisig:
             pubkey_providers = [

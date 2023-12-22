@@ -8,6 +8,7 @@
 * It also provides 
   * AddressTypes, which are the commonly used bitcoin output descriptor templates
   * seed_tools.derive_spk_provider  to derive xpubs from seeds for all AddressTypes  (bdk does not support multisig templates currently https://github.com/bitcoindevkit/bdk/issues/1020)
+  * SoftwareSigner which can sign single and multisig PSBTs   
 
 
 ### Demo
@@ -27,6 +28,10 @@ Run tests
 python -m pytest -vvv  --log-cli-level=0
 ```
 
+### Library Usage
+
+* For xpub derivation bip_utils is used
+* For signing a psbt python-bitcointx is used
 
 
 # Install package
@@ -49,13 +54,3 @@ pip install .
 ```
 
 
-
-
-
-# Licences
-
-The *bitcoin_qrreader*  folder is under the [GPL3](LICENSE).
-
-The folder *ur* is from https://github.com/Foundation-Devices/foundation-ur-py  and under   [BSD-2-Clause Plus Patent License](ur/LICENSE).
-
-The folder *urtypes* from https://github.com/selfcustody/urtypes  is under  [MIT](urtypes/LICENSE.md).

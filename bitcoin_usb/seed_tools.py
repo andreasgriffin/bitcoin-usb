@@ -10,6 +10,10 @@ from bip_utils import (
     Bip39SeedGenerator,
     Bip32Slip10Secp256k1,
     Bip39Languages,
+    Bip32PrivateKeySerializer,
+    Bip32FingerPrint,
+    Bip32KeyData,
+    Bip32KeyIndex,
 )
 from bip_utils.bip.bip32 import (
     Bip32PublicKeySerializer,
@@ -31,6 +35,40 @@ def key_origin_fits_network(key_origin: str, network: bdk.Network):
     else:
         # https://learnmeabitcoin.com/technical/derivation-paths
         raise ValueError(f"Unknown network/coin type {network_str} in {key_origin}")
+
+
+def get_bip32_ext_private_key(mnemonic: str, network: bdk.Network):
+    # Attempt to decode the mnemonic (this will also validate it)
+    try:
+        Bip39MnemonicDecoder(Bip39Languages.ENGLISH).Decode(mnemonic)
+    except ValueError as e:
+        raise ValueError("Invalid mnemonic phrase.") from e
+
+    # Generate seed from mnemonic
+    seed_bytes = Bip39SeedGenerator(mnemonic).Generate()
+
+    # Create a Bip32 object using SLIP-0010 for the secp256k1 curve (used by Bitcoin)
+    bip32_master_key = Bip32Slip10Secp256k1.FromSeed(seed_bytes)
+
+    net_ver = (
+        Bip32Const.MAIN_NET_KEY_NET_VERSIONS
+        if network == bdk.Network.BITCOIN
+        else Bip32Const.TEST_NET_KEY_NET_VERSIONS
+    )
+
+    # Get the private key object (IPrivateKey instance)
+    priv_key = bip32_master_key.PrivateKey()
+
+    # Create Bip32KeyData for the master key
+    key_data = Bip32KeyData(
+        depth=0,
+        parent_fprint=Bip32FingerPrint(),
+        index=Bip32KeyIndex(0),
+        chain_code=bip32_master_key.ChainCode(),
+    )
+
+    # Serialize the private key with the specified network version
+    return Bip32PrivateKeySerializer.Serialize(priv_key, key_data, net_ver)
 
 
 def derive(mnemonic: str, key_origin: str, network: bdk.Network) -> str:
