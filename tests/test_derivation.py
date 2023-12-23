@@ -94,6 +94,21 @@ def test_correct_44derivation():
     assert spk_provider.fingerprint == "7c85f2b5"
 
 
+def test_correct_84derivation():
+    spk_provider = derive_spk_provider(
+        "spider manual inform reject arch raccoon betray moon document across main build",
+        AddressTypes.p2wpkh.key_origin(network),
+        network,
+    )
+    print(spk_provider)
+    assert spk_provider.key_origin == "m/84h/1h/0h"
+    assert (
+        spk_provider.xpub
+        == "tpubDCPkYWRWsTRZji1938hvWzdDsfQ39aasHz47s3htaKyYSHGdZBoNynBzwQsFS4xn4X4basMr1qL3DcPbjhcVNCzLzGhLoZixu2CAke9Q3hK"
+    )
+    assert spk_provider.fingerprint == "7c85f2b5"
+
+
 def test_wrong_network():
     with pytest.raises(ValueError) as exc_info:
         xpub, fingerprint = derive(

@@ -30,14 +30,16 @@ class SoftwareSigner(BaseDevice):
     def get_fingerprint(self) -> str:
         # it doesn't mattrer which AddressTypes i choose, because the fingerprint is identical for all
         address_type = AddressTypes.p2wsh
-        xpub, fingerprint = derive(self.mnemonic, address_type.key_origin, self.network)
+        xpub, fingerprint = derive(
+            self.mnemonic, address_type.key_origin(self.network), self.network
+        )
         return fingerprint
 
     def get_xpubs(self) -> Dict[AddressTypes, str]:
         xpubs = {}
         for address_type in get_all_address_types():
             xpub, fingerprint = derive(
-                self.mnemonic, address_type.key_origin, self.network
+                self.mnemonic, address_type.key_origin(self.network), self.network
             )
             xpubs[address_type] = xpub
         return xpubs

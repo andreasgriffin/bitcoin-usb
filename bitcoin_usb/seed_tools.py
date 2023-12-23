@@ -108,7 +108,7 @@ def derive(mnemonic: str, key_origin: str, network: bdk.Network) -> str:
     xpub = Bip32PublicKeySerializer.Serialize(
         bip32_base.PublicKey().m_pub_key, bip32_base.PublicKey().m_key_data, net_ver
     )
-    fingerprint = bip32_obj.FingerPrint()
+    fingerprint = bip32_obj.FingerPrint().ToHex()
     return xpub, fingerprint
 
 
