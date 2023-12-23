@@ -88,13 +88,14 @@ class USBDevice(BaseDevice):
     def get_fingerprint(self) -> str:
         return self.client.get_master_fingerprint().hex()
 
-    def get_xpubs(self) -> Dict[AddressTypes, str]:
+    def get_xpubs(self) -> Dict[AddressType, str]:
         xpubs = {}
         for address_type in get_all_address_types():
-            xpubs[address_type] = self.client.get_pubkey_at_path(
-                address_type.key_origin(self.network)
-            ).to_string()
+            xpubs[address_type] = self.get_xpub(address_type.key_origin(self.network))
         return xpubs
+
+    def get_xpub(self, key_origin: str) -> str:
+        return self.client.get_pubkey_at_path(key_origin).to_string()
 
     def sign_psbt(
         self, psbt: bdk.PartiallySignedTransaction
