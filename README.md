@@ -1,4 +1,4 @@
-# A python usb wrapper around hwi
+# Wrapper around hwi, such that one can sign bdk PSBTs directly
 
 * This provides an abstraction layer ontop of hwi, such that only bdk is needed from the outside
 * Currently supported are
@@ -8,7 +8,7 @@
 * It also provides 
   * AddressTypes, which are the commonly used bitcoin output descriptor templates
   * seed_tools.derive_spk_provider  to derive xpubs from seeds for all AddressTypes  (bdk does not support multisig templates currently https://github.com/bitcoindevkit/bdk/issues/1020)
-  * SoftwareSigner which can sign single and multisig PSBTs   
+  * SoftwareSigner which can sign single and multisig PSBTs, this doesn't do any security checks, so only use it on testnet
 
 
 ### Demo
