@@ -18,7 +18,7 @@ with open("README.md", "r") as fh:
 
 setup(
     name="bitcoin_usb",
-    version="0.1.1",
+    version="0.1.2",
     author="Andreas Griffin",
     author_email="andreasgriffin@proton.me",
     description="Wrapper around hwi, such that one can sign bdk PSBTs directly",

@@ -25,7 +25,6 @@ from bip_utils.bip.bip32 import (
 def key_origin_fits_network(key_origin: str, network: bdk.Network):
     network_str = key_origin.split("/")[2]
     assert network_str.endswith("h")
-    print(network_str)
     network_index = int(network_str.replace("h", ""))
 
     if network_index == 0:
