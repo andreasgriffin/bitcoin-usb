@@ -1,9 +1,10 @@
 import logging
+from typing import Tuple
 import bdkpython as bdk
 
 logger = logging.getLogger(__name__)
 
-from .address_types import SimplePubKeyProvider, AddressTypes, AddressType
+from .address_types import SimplePubKeyProvider
 
 from bip_utils import (
     Bip39MnemonicDecoder,
@@ -17,7 +18,6 @@ from bip_utils import (
 )
 from bip_utils.bip.bip32 import (
     Bip32PublicKeySerializer,
-    Bip32KeyNetVersions,
     Bip32Const,
 )
 
@@ -70,7 +70,7 @@ def get_bip32_ext_private_key(mnemonic: str, network: bdk.Network):
     return Bip32PrivateKeySerializer.Serialize(priv_key, key_data, net_ver)
 
 
-def derive(mnemonic: str, key_origin: str, network: bdk.Network) -> str:
+def derive(mnemonic: str, key_origin: str, network: bdk.Network) -> Tuple[str, str]:
     """
     Derive the extended public key (xpub/tpub) from a given mnemonic, derivation path, and network version.
 

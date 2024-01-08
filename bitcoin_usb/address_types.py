@@ -3,11 +3,10 @@ import logging
 logger = logging.getLogger(__name__)
 
 import bdkpython as bdk
-from typing import Callable, Dict, List, Tuple
+from typing import Callable, Dict, List
 
 from hwilib.descriptor import (
     parse_descriptor,
-    Descriptor,
     PubkeyProvider,
     WPKHDescriptor,
     WSHDescriptor,
@@ -16,7 +15,7 @@ from hwilib.descriptor import (
     TRDescriptor,
     SHDescriptor,
 )
-from hwilib.key import KeyOriginInfo, HARDENED_FLAG
+from hwilib.key import KeyOriginInfo
 from hwilib.common import AddressType as HWIAddressType
 
 
@@ -68,9 +67,7 @@ class AddressType:
     def __repr__(self):
         return f"AddressType({self.__dict__})"
 
-    def get_bip32_path(
-        self, network: bdk.Network, keychain: bdk.KeychainKind, address_index: int
-    ) -> str:
+    def get_bip32_path(self, network: bdk.Network, keychain: bdk.KeychainKind, address_index: int) -> str:
         return f"m/{0 if keychain == bdk.KeychainKind.EXTERNAL else 1}/{address_index}"
 
 
@@ -140,7 +137,7 @@ def get_address_type_dicts() -> Dict[str, AddressType]:
 
 
 def get_all_address_types() -> List[AddressType]:
-    return get_address_type_dicts().values()
+    return list(get_address_type_dicts().values())
 
 
 def get_address_types(is_multisig: bool) -> List[AddressType]:
@@ -173,18 +170,34 @@ class SimplePubKeyProvider:
         derivation_path: str = ConstDerivationPaths.receive,
     ) -> None:
         self.xpub = xpub
-        self.fingerprint = fingerprint
+        self.fingerprint = self.format_fingerprint(fingerprint)
         # key_origin example: "m/84h/1h/0h"
-        assert key_origin.startswith("m/")
-        self.key_origin = key_origin.replace("'", "h")
+        self.key_origin = self.format_key_origin(key_origin)
         # derivation_path example "/0/*"
-        assert derivation_path.startswith("/")
-        self.derivation_path = derivation_path
+        self.derivation_path = self.format_derivation_path(derivation_path)
+
+    def format_derivation_path(self, value):
+        assert value.startswith("/")
+        return value.replace("'", "h")
+
+    def format_key_origin(self, value):
+        assert value.startswith("m/"), "The value must start with m/"
+        return value.replace("'", "h")
+
+    @classmethod
+    def is_fingerprint_valid(cls, fingerprint):
+        try:
+            int(fingerprint, 16)
+            return len(fingerprint) == 8
+        except ValueError:
+            return False
+
+    def format_fingerprint(self, value):
+        assert self.is_fingerprint_valid(value)
+        return value.upper()
 
     def clone(self) -> "SimplePubKeyProvider":
-        return SimplePubKeyProvider(
-            self.xpub, self.fingerprint, self.key_origin, self.derivation_path
-        )
+        return SimplePubKeyProvider(self.xpub, self.fingerprint, self.key_origin, self.derivation_path)
 
     def is_testnet(self):
         network_str = self.key_origin.split("/")[2]
@@ -196,9 +209,7 @@ class SimplePubKeyProvider:
             return True
         else:
             # https://learnmeabitcoin.com/technical/derivation-paths
-            raise ValueError(
-                f"Unknown network/coin type {network_str} in {self.key_origin}"
-            )
+            raise ValueError(f"Unknown network/coin type {network_str} in {self.key_origin}")
 
     @classmethod
     def from_hwi(cls, pubkey_provider: PubkeyProvider) -> "SimplePubKeyProvider":
@@ -212,9 +223,7 @@ class SimplePubKeyProvider:
     def to_hwi_pubkey_provider(self) -> PubkeyProvider:
 
         provider = PubkeyProvider(
-            origin=KeyOriginInfo.from_string(
-                self.key_origin.replace("m/", f"{self.fingerprint}/")
-            ),
+            origin=KeyOriginInfo.from_string(self.key_origin.replace("m/", f"{self.fingerprint}/")),
             pubkey=self.xpub,
             deriv_path=self.derivation_path,
         )
@@ -239,8 +248,7 @@ def _get_descriptor_instances(descriptor):
 def _find_matching_address_type(instance_tuple, address_types: List[AddressType]):
     for address_type in address_types:
         if len(instance_tuple) == len(address_type.hwi_descriptor_classes) and all(
-            isinstance(i, c)
-            for i, c in zip(instance_tuple, address_type.hwi_descriptor_classes)
+            isinstance(i, c) for i, c in zip(instance_tuple, address_type.hwi_descriptor_classes)
         ):
             return address_type
     return None
@@ -272,16 +280,12 @@ class DescriptorInfo:
         ]
         for spk_provider in self.spk_providers:
             if spk_provider.key_origin not in common_key_origins:
-                logger.warning(
-                    f"{spk_provider.key_origin } is not a common multisig key_origin!"
-                )
+                logger.warning(f"{spk_provider.key_origin } is not a common multisig key_origin!")
 
         if self.address_type.is_multisig:
             assert self.address_type.hwi_descriptor_classes[-1] == MultisigDescriptor
             hwi_descriptor = MultisigDescriptor(
-                pubkeys=[
-                    provider.to_hwi_pubkey_provider() for provider in self.spk_providers
-                ],
+                pubkeys=[provider.to_hwi_pubkey_provider() for provider in self.spk_providers],
                 thresh=self.threshold,
                 is_sorted=True,
             )
@@ -290,17 +294,13 @@ class DescriptorInfo:
                 self.spk_providers[0].to_hwi_pubkey_provider()
             )
 
-        for hwi_descriptor_class in reversed(
-            self.address_type.hwi_descriptor_classes[:-1]
-        ):
+        for hwi_descriptor_class in reversed(self.address_type.hwi_descriptor_classes[:-1]):
             hwi_descriptor = hwi_descriptor_class(hwi_descriptor)
 
         return hwi_descriptor
 
     def get_bdk_descriptor(self, network: bdk.Network):
-        return bdk.Descriptor(
-            self.get_hwi_descriptor(network).to_string(), network=network
-        )
+        return bdk.Descriptor(self.get_hwi_descriptor(network).to_string(), network=network)
 
     @classmethod
     def from_str(cls, descriptor_str: str) -> "DescriptorInfo":
@@ -311,9 +311,7 @@ class DescriptorInfo:
             _get_descriptor_instances(hwi_descriptor), get_all_address_types()
         )
         if not address_type:
-            raise ValueError(
-                f"descriptor {descriptor_str} cannot be matched to known template"
-            )
+            raise ValueError(f"descriptor {descriptor_str} cannot be matched to known template")
 
         # get the     pubkey_providers, by "walking to the end of desciptors"
         threshold = 1
@@ -321,11 +319,7 @@ class DescriptorInfo:
         for descritptor_class in address_type.hwi_descriptor_classes:
             # just double checking that _find_matching_address_type did its job correctly
             assert isinstance(subdescriptor, descritptor_class)
-            subdescriptor = (
-                subdescriptor.subdescriptors[0]
-                if subdescriptor.subdescriptors
-                else subdescriptor
-            )
+            subdescriptor = subdescriptor.subdescriptors[0] if subdescriptor.subdescriptors else subdescriptor
 
         pubkey_providers = subdescriptor.pubkeys
         if isinstance(subdescriptor, MultisigDescriptor):
@@ -335,8 +329,7 @@ class DescriptorInfo:
         return DescriptorInfo(
             address_type=address_type,
             spk_providers=[
-                SimplePubKeyProvider.from_hwi(pubkey_provider)
-                for pubkey_provider in pubkey_providers
+                SimplePubKeyProvider.from_hwi(pubkey_provider) for pubkey_provider in pubkey_providers
             ],
             threshold=threshold,
         )

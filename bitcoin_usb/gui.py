@@ -1,7 +1,5 @@
-import sys
-from typing import Dict
+from typing import Dict, List, Optional, Tuple
 from PySide2.QtWidgets import (
-    QApplication,
     QMainWindow,
     QPushButton,
     QLabel,
@@ -15,7 +13,6 @@ import hwilib.commands as hwi_commands
 from .device import USBDevice
 import bdkpython as bdk
 from PySide2.QtWidgets import (
-    QApplication,
     QMainWindow,
     QPushButton,
     QVBoxLayout,
@@ -68,9 +65,7 @@ class InfoDialog(QDialog):
 
 
 class USBGui:
-    def __init__(
-        self, network: bdk.Network, autoselect_if_1_device=False, parent=None
-    ) -> None:
+    def __init__(self, network: bdk.Network, autoselect_if_1_device=False, parent=None) -> None:
         self.autoselect_if_1_device = autoselect_if_1_device
         self.network = network
         self.parent = parent
@@ -79,7 +74,7 @@ class USBGui:
         devices = hwi_commands.enumerate()
         if not devices:
             InfoDialog("No USB devices found").exec_()
-            return
+            return {}
         if len(devices) == 1 and self.autoselect_if_1_device:
             return devices[0]
         else:
@@ -88,39 +83,42 @@ class USBGui:
                 return dialog.get_selected_device()
             else:
                 InfoDialog("No device selected").exec_()
+        return {}
 
-    def sign(
-        self, psbt: bdk.PartiallySignedTransaction
-    ) -> bdk.PartiallySignedTransaction:
+    def sign(self, psbt: bdk.PartiallySignedTransaction) -> bdk.PartiallySignedTransaction:
         selected_device = self.get_device()
         if selected_device:
             with USBDevice(selected_device, self.network) as dev:
                 return dev.sign_psbt(psbt)
+        return None
 
-    def get_fingerprint_and_xpubs(self):
+    def get_fingerprint_and_xpubs(self) -> Optional[Tuple[str, List[str]]]:
         selected_device = self.get_device()
         if selected_device:
             with USBDevice(selected_device, self.network) as dev:
                 return dev.get_fingerprint(), dev.get_xpubs()
+        return None
 
-    def get_fingerprint_and_xpub(self, key_origin: str):
+    def get_fingerprint_and_xpub(self, key_origin: str) -> Optional[Tuple[str, str]]:
         selected_device = self.get_device()
         if selected_device:
             with USBDevice(selected_device, self.network) as dev:
                 return dev.get_fingerprint(), dev.get_xpub(key_origin)
+        return None
 
-    def sign_message(self, message: str, bip32_path: str) -> str:
+    def sign_message(self, message: str, bip32_path: str) -> Optional[str]:
         selected_device = self.get_device()
         if selected_device:
             with USBDevice(selected_device, self.network) as dev:
                 return dev.sign_message(message, bip32_path)
+        return None
 
     def display_address(
         self,
         descriptor_str: str,
         keychain: bdk.KeychainKind,
         address_index: int,
-    ) -> str:
+    ):
         selected_device = self.get_device()
         if selected_device:
             with USBDevice(selected_device, self.network) as dev:

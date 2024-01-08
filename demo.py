@@ -1,12 +1,11 @@
-from PySide2.QtCore import *
-from PySide2.QtGui import *
-from PySide2.QtWidgets import *
+from PySide2.QtWidgets import (
+    QApplication,
+)
 
-from  bitcoin_usb import gui
+from bitcoin_usb import gui
 import sys
 
 import bdkpython as bdk
-
 
 
 if __name__ == "__main__":

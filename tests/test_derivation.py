@@ -1,8 +1,6 @@
-from numpy import lookfor
 from bitcoin_usb.address_types import *
 import pytest
 from bitcoin_usb.seed_tools import derive_spk_provider, derive
-from unittest.mock import patch
 
 # test seeds
 # seed1: spider manual inform reject arch raccoon betray moon document across main build
@@ -26,25 +24,18 @@ def test_compare_single_sig_key_derivation_with_bdk_templates():
                 continue
 
             descriptor = address_type.bdk_descriptor_secret(
-                secret_key=bdk.DescriptorSecretKey(
-                    network, bdk.Mnemonic.from_string(test_seed), ""
-                ),
+                secret_key=bdk.DescriptorSecretKey(network, bdk.Mnemonic.from_string(test_seed), ""),
                 keychain=bdk.KeychainKind.EXTERNAL,
                 network=network,
             )
 
-            spk_provider = derive_spk_provider(
-                test_seed, address_type.key_origin(network), network
-            )
+            spk_provider = derive_spk_provider(test_seed, address_type.key_origin(network), network)
 
             desc_info = DescriptorInfo(address_type, [spk_provider])
-            assert descriptor.as_string() == desc_info.get_hwi_descriptor(
-                network
-            ).to_string(hardened_char="'")
-            assert (
-                descriptor.as_string()
-                == desc_info.get_bdk_descriptor(network).as_string()
+            assert descriptor.as_string() == desc_info.get_hwi_descriptor(network).to_string(
+                hardened_char="'"
             )
+            assert descriptor.as_string() == desc_info.get_bdk_descriptor(network).as_string()
 
 
 def test_correct_p2sh_p2wsh_derivation():
@@ -60,7 +51,7 @@ def test_correct_p2sh_p2wsh_derivation():
         == "tpubDEBYeoKBCaY1fZ3PSpdYjeedEx5oWowEn8Pa8pS19RWQK5bvAJVFa7Qe8N8e6uCxtwJvwtWiGnHawY3GwbHiUtv17RUpL3FYxckC5QmRWip"
     )
     # compared with sparrow
-    assert spk_provider.fingerprint == "7c85f2b5"
+    assert spk_provider.fingerprint == "7c85f2b5".upper()
 
 
 def test_correct_p2wsh_derivation():
@@ -76,7 +67,7 @@ def test_correct_p2wsh_derivation():
         == "tpubDEBYeoKBCaY1h6353GCojAoPdi7GGz4JYhyac8StrxBWKZCb5nQQQJCFndXFmFGgakmPxS3zQkkCxzKGuLGBKhgfL96jrc6L3rn1D5bAhjo"
     )
     # compared with sparrow
-    assert spk_provider.fingerprint == "7c85f2b5"
+    assert spk_provider.fingerprint == "7c85f2b5".upper()
 
 
 def test_correct_44derivation():
@@ -91,7 +82,7 @@ def test_correct_44derivation():
         spk_provider.xpub
         == "tpubDCwGRkTC8E2QbbUPZvpXQad4zRHqo24YTJpAFDtJh1x6nTBojiKTorqCm2JQdnDEwLruKry8NTont7tG6jqZCFnp5c2evppfedDdRRAJxrX"
     )
-    assert spk_provider.fingerprint == "7c85f2b5"
+    assert spk_provider.fingerprint == "7c85f2b5".upper()
 
 
 def test_correct_84derivation():
@@ -106,7 +97,7 @@ def test_correct_84derivation():
         spk_provider.xpub
         == "tpubDCPkYWRWsTRZji1938hvWzdDsfQ39aasHz47s3htaKyYSHGdZBoNynBzwQsFS4xn4X4basMr1qL3DcPbjhcVNCzLzGhLoZixu2CAke9Q3hK"
     )
-    assert spk_provider.fingerprint == "7c85f2b5"
+    assert spk_provider.fingerprint == "7c85f2b5".upper()
 
 
 def test_wrong_network():
@@ -116,10 +107,7 @@ def test_wrong_network():
             "m/48h/0h/0h/2h",
             network,
         )
-    assert (
-        str(exc_info.value)
-        == "m/48h/0h/0h/2h does not fit to the selected network Network.REGTEST"
-    )
+    assert str(exc_info.value) == "m/48h/0h/0h/2h does not fit to the selected network Network.REGTEST"
 
 
 def test_multisig():
@@ -140,9 +128,7 @@ def test_multisig():
             network,
         ),
     ]
-    descriptor = DescriptorInfo(
-        AddressTypes.p2wsh, spk_providers, 2
-    ).get_bdk_descriptor(network)
+    descriptor = DescriptorInfo(AddressTypes.p2wsh, spk_providers, 2).get_bdk_descriptor(network)
     stripped = descriptor.as_string().split("#")[0].replace("'", "h")
     # comparision created with sparrow (had to reorder the pubkey_providers)
     assert (
@@ -170,9 +156,7 @@ def test_multisig_unusual_key_origin(caplog):
             network,
         ),
     ]
-    descriptor = DescriptorInfo(
-        AddressTypes.p2wsh, spk_providers, 2
-    ).get_bdk_descriptor(network)
+    descriptor = DescriptorInfo(AddressTypes.p2wsh, spk_providers, 2).get_bdk_descriptor(network)
     stripped = descriptor.as_string().split("#")[0].replace("'", "h")
     # comparision created with sparrow (had to reorder the pubkey_providers)
     assert (
@@ -180,6 +164,4 @@ def test_multisig_unusual_key_origin(caplog):
         == "wsh(sortedmulti(2,[7c85f2b5/44h/1h/0h]tpubDCwGRkTC8E2QbbUPZvpXQad4zRHqo24YTJpAFDtJh1x6nTBojiKTorqCm2JQdnDEwLruKry8NTont7tG6jqZCFnp5c2evppfedDdRRAJxrX/0/*,[34be20d9/48h/1h/0h/2h]tpubDEGiMrEBpyW7ebPDipDBwgxi4Ct4VqDApRcDEZy6uT8HoE5jUduJiXH7axkuQdcf7ZGamBbng7Ym3MPwLHqkugswt1uCParZBGyGsfEZ7PQ/0/*,[3b8adfc3/48h/1h/0h/2h]tpubDEmjAPbjr9QfDidVmgSGdK6JYXiFy1xw9pVmXXSbZxa8qz2ixtZhaRyLdMS3wwECPao4PRC4dGWXnpwnzGUAaVewbW9VtkYaMg4neeTFLm6/0/*))"
     )
 
-    assert (
-        "m/44h/1h/0h is not a common multisig key_origin!" == caplog.records[-1].message
-    )
+    assert "m/44h/1h/0h is not a common multisig key_origin!" == caplog.records[-1].message

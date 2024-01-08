@@ -1,6 +1,4 @@
 from bitcoin_usb.address_types import *
-import pytest
-from unittest.mock import patch
 from bitcoin_usb.software_signer import SoftwareSigner
 
 # test seeds
@@ -42,9 +40,7 @@ def test_single_multisig_sign():
     logger.info(signed_psbt.serialize())
 
     # now sign with 2. key
-    seed = (
-        "similar seek stock parent depart rug adjust acoustic oppose sell roast hockey"
-    )
+    seed = "similar seek stock parent depart rug adjust acoustic oppose sell roast hockey"
 
     psbt = signed_psbt.serialize()
 
