@@ -176,11 +176,13 @@ class SimplePubKeyProvider:
         # derivation_path example "/0/*"
         self.derivation_path = self.format_derivation_path(derivation_path)
 
-    def format_derivation_path(self, value):
+    @classmethod
+    def format_derivation_path(cls, value):
         assert value.startswith("/")
         return value.replace("'", "h")
 
-    def format_key_origin(self, value):
+    @classmethod
+    def format_key_origin(cls, value):
         assert value.startswith("m/"), "The value must start with m/"
         return value.replace("'", "h")
 
@@ -192,8 +194,9 @@ class SimplePubKeyProvider:
         except ValueError:
             return False
 
-    def format_fingerprint(self, value):
-        assert self.is_fingerprint_valid(value)
+    @classmethod
+    def format_fingerprint(cls, value):
+        assert cls.is_fingerprint_valid(value)
         return value.upper()
 
     def clone(self) -> "SimplePubKeyProvider":
