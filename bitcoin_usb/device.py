@@ -1,6 +1,6 @@
-from abc import ABC, abstractmethod
 import logging
 import threading
+from abc import ABC, abstractmethod
 
 import hwilib.commands as hwi_commands
 from hwilib.common import Chain
@@ -8,16 +8,17 @@ from hwilib.psbt import PSBT
 
 logger = logging.getLogger(__name__)
 
-import bdkpython as bdk
+from typing import Any, Dict
 
-from typing import *
+import bdkpython as bdk
+from hwilib.descriptor import MultisigDescriptor as HWIMultisigDescriptor
+
 from .address_types import (
     AddressType,
     DescriptorInfo,
     get_all_address_types,
     get_hwi_address_type,
 )
-from hwilib.descriptor import MultisigDescriptor as HWIMultisigDescriptor
 
 
 class BaseDevice(ABC):

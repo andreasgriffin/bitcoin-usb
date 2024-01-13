@@ -1,4 +1,4 @@
-from bitcoin_usb.address_types import *
+from bitcoin_usb.address_types import bdk, logger
 from bitcoin_usb.software_signer import SoftwareSigner
 
 # test seeds

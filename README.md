@@ -48,9 +48,24 @@ pip install bitcoin_usb
 
 ###  From git
 
+* Install  requirements:
+
 ```shell
-python setup.py sdist bdist_wheel
-pip install .
+poetry install
+```
+
+* Automatic commit formatting
+
+```shell
+pip install pre-commit
+pre-commit install
+```
+
+
+* Run the precommit manually for debugging
+
+```shell
+pre-commit run --all-files
 ```
 
 

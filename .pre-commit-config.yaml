@@ -4,10 +4,18 @@ repos:
     hooks:
       - id: autoflake
         args:
+          - --expand-star-imports
           - --remove-all-unused-imports
           - --remove-unused-variables
           - --in-place
           - --exclude=__init__.py
+          - --remove-duplicate-keys 
+  - repo: https://github.com/pre-commit/mirrors-isort
+    rev: v5.10.1  # Use the specified version of isort
+    hooks:
+      - id: isort
+        args:
+          - --profile=black  # Set the import order style (change 'google' to your preferred style)          
   - repo: https://github.com/ambv/black
     rev: 22.3.0
     hooks:
@@ -18,4 +26,6 @@ repos:
     hooks:
       - id: mypy
         # Additional arguments to MyPy can be added here
-        args: [ ]
+        args: [ --check-untyped-defs]
+        additional_dependencies: [types-requests, types-PyYAML]      
+

@@ -1,6 +1,13 @@
-from bitcoin_usb.address_types import *
 import pytest
-from bitcoin_usb.seed_tools import derive_spk_provider, derive
+
+from bitcoin_usb.address_types import (
+    AddressTypes,
+    DescriptorInfo,
+    bdk,
+    get_all_address_types,
+    logging,
+)
+from bitcoin_usb.seed_tools import derive, derive_spk_provider
 
 # test seeds
 # seed1: spider manual inform reject arch raccoon betray moon document across main build

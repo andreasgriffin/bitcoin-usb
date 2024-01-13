@@ -1,25 +1,23 @@
-from typing import Dict, List, Optional, Tuple
-from PySide2.QtWidgets import (
-    QMainWindow,
-    QPushButton,
-    QLabel,
-    QDialog,
-    QVBoxLayout,
-    QTextEdit,
-    QLineEdit,
-    QTabWidget,
-)
-import hwilib.commands as hwi_commands
-from .device import USBDevice
+from typing import Dict, Optional, Tuple
+
 import bdkpython as bdk
+import hwilib.commands as hwi_commands
 from PySide2.QtWidgets import (
+    QComboBox,
+    QDialog,
+    QLabel,
+    QLineEdit,
     QMainWindow,
     QPushButton,
+    QTabWidget,
+    QTextEdit,
     QVBoxLayout,
     QWidget,
-    QTextEdit,
-    QComboBox,
 )
+
+from bitcoin_usb.address_types import AddressType
+
+from .device import USBDevice
 
 
 class DeviceDialog(QDialog):
@@ -92,7 +90,7 @@ class USBGui:
                 return dev.sign_psbt(psbt)
         return None
 
-    def get_fingerprint_and_xpubs(self) -> Optional[Tuple[str, List[str]]]:
+    def get_fingerprint_and_xpubs(self) -> Optional[Tuple[str, Dict[AddressType, str]]]:
         selected_device = self.get_device()
         if selected_device:
             with USBDevice(selected_device, self.network) as dev:
@@ -207,7 +205,10 @@ class MainWindow(QMainWindow):
 
     def on_button_clicked(self):
         self.xpubs_text_edit.setText("")
-        fingerprint, xpubs = self.usb.get_fingerprint_and_xpubs()
+        fingerprint_and_xpus = self.usb.get_fingerprint_and_xpubs()
+        if not fingerprint_and_xpus:
+            return
+        fingerprint, xpubs = fingerprint_and_xpus
 
         if xpubs:
             txt = "\n".join(

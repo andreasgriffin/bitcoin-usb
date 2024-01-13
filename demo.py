@@ -1,12 +1,9 @@
-from PySide2.QtWidgets import (
-    QApplication,
-)
-
-from bitcoin_usb import gui
 import sys
 
 import bdkpython as bdk
+from PySide2.QtWidgets import QApplication
 
+from bitcoin_usb import gui
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)

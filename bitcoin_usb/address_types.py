@@ -2,21 +2,21 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-import bdkpython as bdk
 from typing import Callable, Dict, List
 
+import bdkpython as bdk
+from hwilib.common import AddressType as HWIAddressType
 from hwilib.descriptor import (
-    parse_descriptor,
+    MultisigDescriptor,
+    PKHDescriptor,
     PubkeyProvider,
+    SHDescriptor,
+    TRDescriptor,
     WPKHDescriptor,
     WSHDescriptor,
-    PKHDescriptor,
-    MultisigDescriptor,
-    TRDescriptor,
-    SHDescriptor,
+    parse_descriptor,
 )
 from hwilib.key import KeyOriginInfo
-from hwilib.common import AddressType as HWIAddressType
 
 
 class ConstDerivationPaths:

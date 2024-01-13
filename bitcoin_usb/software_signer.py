@@ -1,23 +1,21 @@
 import logging
 from typing import Dict, List
+
 import bdkpython as bdk
 
 logger = logging.getLogger(__name__)
+import base64
+
+from bitcointx import select_chain_params
+from bitcointx.core.key import BIP32PathTemplate, KeyStore
 from bitcointx.core.psbt import (
     PartiallySignedTransaction as TXPartiallySignedTransaction,
 )
-from bitcointx import select_chain_params
-import base64
 from bitcointx.wallet import CCoinExtKey
-from bitcointx.core.key import KeyStore, BIP32PathTemplate
 
-from .address_types import (
-    AddressType,
-    AddressTypes,
-    get_all_address_types,
-)
-from .seed_tools import derive, get_bip32_ext_private_key
+from .address_types import AddressType, AddressTypes, get_all_address_types
 from .device import BaseDevice
+from .seed_tools import derive, get_bip32_ext_private_key
 
 
 class SoftwareSigner(BaseDevice):

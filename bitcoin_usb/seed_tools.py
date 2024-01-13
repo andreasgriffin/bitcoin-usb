@@ -1,25 +1,23 @@
 import logging
 from typing import Tuple
+
 import bdkpython as bdk
 
 logger = logging.getLogger(__name__)
 
-from .address_types import SimplePubKeyProvider
-
 from bip_utils import (
-    Bip39MnemonicDecoder,
-    Bip39SeedGenerator,
-    Bip32Slip10Secp256k1,
-    Bip39Languages,
-    Bip32PrivateKeySerializer,
     Bip32FingerPrint,
     Bip32KeyData,
     Bip32KeyIndex,
+    Bip32PrivateKeySerializer,
+    Bip32Slip10Secp256k1,
+    Bip39Languages,
+    Bip39MnemonicDecoder,
+    Bip39SeedGenerator,
 )
-from bip_utils.bip.bip32 import (
-    Bip32PublicKeySerializer,
-    Bip32Const,
-)
+from bip_utils.bip.bip32 import Bip32Const, Bip32PublicKeySerializer
+
+from .address_types import SimplePubKeyProvider
 
 
 def key_origin_fits_network(key_origin: str, network: bdk.Network):
