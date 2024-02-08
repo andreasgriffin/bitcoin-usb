@@ -2,7 +2,7 @@ from typing import Dict, Optional, Tuple
 
 import bdkpython as bdk
 import hwilib.commands as hwi_commands
-from PySide2.QtWidgets import (
+from PyQt6.QtWidgets import (
     QComboBox,
     QDialog,
     QLabel,

@@ -11,20 +11,19 @@ disable_error_code = "assignment"
 
 [tool.poetry]
 name = "bitcoin-usb"
-version = "0.1.5"
+version = "0.1.6"
 authors = ["andreasgriffin <andreasgriffin@proton.me>"]
 license = "GPL-3.0"
 readme = "README.md"
 description = "Wrapper around hwi, such that one can sign bdk PSBTs directly"
 
 [tool.poetry.dependencies]
-python = ">=3.9,<3.11"
-bdkpython ="0.30.0"
+python = ">=3.7,<3.12"
+bdkpython ="0.31.0"
 bip-utils = "2.9.0"
 python-bitcointx = "1.1.4"
 hwi = "2.3.1"
-pyside2 = "^5.15.2.1"
-numpy = "^1.26.3"
+pyqt6 = "^6.6.1"
 
 
 

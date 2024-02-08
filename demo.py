@@ -1,7 +1,7 @@
 import sys
 
 import bdkpython as bdk
-from PySide2.QtWidgets import QApplication
+from PyQt6.QtWidgets import QApplication
 
 from bitcoin_usb import gui
 
