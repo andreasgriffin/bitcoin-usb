@@ -229,7 +229,7 @@ class SimplePubKeyProvider:
     def to_hwi_pubkey_provider(self) -> PubkeyProvider:
 
         provider = PubkeyProvider(
-            origin=KeyOriginInfo.from_string(self.key_origin.replace("m/", f"{self.fingerprint}/")),
+            origin=KeyOriginInfo.from_string(self.key_origin.replace("m", f"{self.fingerprint}")),
             pubkey=self.xpub,
             deriv_path=self.derivation_path,
         )

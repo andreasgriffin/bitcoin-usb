@@ -38,6 +38,12 @@ def test_xpub_at_root():
     assert descriptor_info.spk_providers[0].key_origin == "m"
     assert descriptor_info.spk_providers[0].derivation_path == "/<0;1>/*"
 
+    # test
+    pubkey_provider = descriptor_info.spk_providers[0].to_hwi_pubkey_provider()
+    pubkey_provider.deriv_path == "/<0;1>/*"
+    pubkey_provider.origin.to_string() == "m"
+    pubkey_provider.to_string() == "[45f35351]tpubDEY3tNWvDs8J6xAmwoirxgff61gPN1V6U5numeb6xjvZRB883NPPpRYHt2A6fUE3YyzDLezFfuosBdXsdXJhJUcpqYWF9EEBmWqG3rG8sdy/<0;1>/*"
+
 
 def test_multisig():
     s = "wsh(sortedmulti(2,[45f35351/48h/1h/0h/2h]tpubDEY3tNWvDs8J6xAmwoirxgff61gPN1V6U5numeb6xjvZRB883NPPpRYHt2A6fUE3YyzDLezFfuosBdXsdXJhJUcpqYWF9EEBmWqG3rG8sdy/<0;1>/*,[829074ff/48h/1h/0h/2h]tpubDDx9arPwEvHGnnkKN1YJXFE4W6JZXyVX9HGjZW75nWe1FCsTYu2k3i7VtCwhGR9zj6UUYnseZUnwL7T6Znru3NmXkcjEQxMqRx7Rxz8rPp4/<0;1>/*,[d5b43540/48h/1h/0h/2h]tpubDFnCcKU3iUF4sPeQC68r2ewDaBB7TvLmQBTs12hnNS8nu6CPjZPmzapp7Woz6bkFuLfSjSpg6gacheKBaWBhDnEbEpKtCnVFdQnfhYGkPQF/<0;1>/*))#54uq36v8"
