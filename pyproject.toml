@@ -16,6 +16,7 @@ authors = ["andreasgriffin <andreasgriffin@proton.me>"]
 license = "GPL-3.0"
 readme = "README.md"
 description = "Wrapper around hwi, such that one can sign bdk PSBTs directly"
+homepage = "https://github.com/andreasgriffin/bitcoin-usb"
 
 [tool.poetry.dependencies]
 python = ">=3.7,<3.12"

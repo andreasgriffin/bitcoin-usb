@@ -183,6 +183,9 @@ class SimplePubKeyProvider:
 
     @classmethod
     def format_key_origin(cls, value):
+        if value == "m":
+            # handle the special case that the key is the highest key without derivation
+            return value
         assert value.startswith("m/"), "The value must start with m/"
         return value.replace("'", "h")
 
