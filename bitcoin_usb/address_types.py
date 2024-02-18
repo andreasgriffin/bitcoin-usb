@@ -2,11 +2,12 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-from typing import Callable, Dict, List
+from typing import Callable, Dict, List, Optional
 
 import bdkpython as bdk
 from hwilib.common import AddressType as HWIAddressType
 from hwilib.descriptor import (
+    Descriptor,
     MultisigDescriptor,
     PKHDescriptor,
     PubkeyProvider,
@@ -239,7 +240,7 @@ class SimplePubKeyProvider:
         return f"{self.__class__.__name__}({self.__dict__})"
 
 
-def _get_descriptor_instances(descriptor):
+def _get_descriptor_instances(descriptor: Descriptor) -> List[Descriptor]:
     "Returns the linear chain of chained descriptors . Multiple subdescriptors return an error"
     assert len(descriptor.subdescriptors) <= 1
     if descriptor.subdescriptors:
@@ -251,10 +252,12 @@ def _get_descriptor_instances(descriptor):
         return [descriptor]
 
 
-def _find_matching_address_type(instance_tuple, address_types: List[AddressType]):
+def _find_matching_address_type(
+    descriptor_tuple: List[Descriptor], address_types: List[AddressType]
+) -> Optional[AddressType]:
     for address_type in address_types:
-        if len(instance_tuple) == len(address_type.hwi_descriptor_classes) and all(
-            isinstance(i, c) for i, c in zip(instance_tuple, address_type.hwi_descriptor_classes)
+        if len(descriptor_tuple) == len(address_type.hwi_descriptor_classes) and all(
+            isinstance(i, c) for i, c in zip(descriptor_tuple, address_type.hwi_descriptor_classes)
         ):
             return address_type
     return None
