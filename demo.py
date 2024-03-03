@@ -10,4 +10,4 @@ if __name__ == "__main__":
     network = bdk.Network.REGTEST
     window = gui.MainWindow(network)
     window.show()
-    sys.exit(app.exec_())
+    sys.exit(app.exec())

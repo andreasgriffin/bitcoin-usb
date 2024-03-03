@@ -44,8 +44,9 @@ class DeviceDialog(QDialog):
 
 
 class InfoDialog(QDialog):
-    def __init__(self, message):
+    def __init__(self, message, title="Info"):
         super().__init__()
+        self.setWindowTitle(title)
 
         # Set up the dialog layout
         layout = QVBoxLayout()
@@ -71,16 +72,16 @@ class USBGui:
     def get_device(self) -> Dict:
         devices = hwi_commands.enumerate()
         if not devices:
-            InfoDialog("No USB devices found").exec_()
+            InfoDialog("No USB devices found", title="USB Devices").exec()
             return {}
         if len(devices) == 1 and self.autoselect_if_1_device:
             return devices[0]
         else:
             dialog = DeviceDialog(self.parent, devices, self.network)
-            if dialog.exec_():
+            if dialog.exec():
                 return dialog.get_selected_device()
             else:
-                InfoDialog("No device selected").exec_()
+                InfoDialog("No device selected", title="USB Devices").exec()
         return {}
 
     def sign(self, psbt: bdk.PartiallySignedTransaction) -> bdk.PartiallySignedTransaction:
