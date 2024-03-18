@@ -114,7 +114,7 @@ def test_wrong_network():
             "m/48h/0h/0h/2h",
             network,
         )
-    assert str(exc_info.value) == "m/48h/0h/0h/2h does not fit to the selected network Network.REGTEST"
+    assert str(exc_info.value) == "m/48h/0h/0h/2h does not fit the selected network Network.REGTEST"
 
 
 def test_multisig():

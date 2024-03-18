@@ -15,7 +15,7 @@ from bitcointx.wallet import CCoinExtKey
 
 from .address_types import AddressType, AddressTypes, get_all_address_types
 from .device import BaseDevice
-from .seed_tools import derive, get_bip32_ext_private_key
+from .seed_tools import derive, get_mnemonic_seed
 
 
 class SoftwareSigner(BaseDevice):
@@ -69,11 +69,7 @@ class SoftwareSigner(BaseDevice):
         # Deserialize the PSBT
         psbt = TXPartiallySignedTransaction.from_base64_or_binary(base64_encoded_psbt)
 
-        # Get BIP32 extended private key
-        bip32_ext_private_key = get_bip32_ext_private_key(self.mnemonic, network=self.network)
-
-        # Convert the BIP32 key to an internal usable format
-        ext_key = CCoinExtKey(bip32_ext_private_key)
+        ext_key = CCoinExtKey.from_seed(get_mnemonic_seed(self.mnemonic))
 
         # Create a keystore and add the extended key with the path template
         keystore = KeyStore()
