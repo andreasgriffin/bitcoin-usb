@@ -1,1 +1,1 @@
-from . import address_types, device, gui, seed_tools
+from bitcointx import set_custom_secp256k1_path
