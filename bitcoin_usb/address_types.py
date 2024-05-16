@@ -43,7 +43,7 @@ class AddressType:
     ) -> None:
         self.name = name
         self.is_multisig = is_multisig
-        self.key_origin: Callable = key_origin
+        self.key_origin: Callable[[bdk.Network], str] = key_origin
         self.bdk_descriptor_secret = bdk_descriptor_secret
         self.info_url = info_url
         self.description = description
@@ -170,7 +170,7 @@ class SimplePubKeyProvider:
         key_origin: str,
         derivation_path: str = ConstDerivationPaths.receive,
     ) -> None:
-        self.xpub = xpub
+        self.xpub = xpub.strip()
         self.fingerprint = self.format_fingerprint(fingerprint)
         # key_origin example: "m/84h/1h/0h"
         self.key_origin = self.format_key_origin(key_origin)
@@ -178,12 +178,14 @@ class SimplePubKeyProvider:
         self.derivation_path = self.format_derivation_path(derivation_path)
 
     @classmethod
-    def format_derivation_path(cls, value):
+    def format_derivation_path(cls, value: str):
+        value = value.replace(" ", "").strip()
         assert value.startswith("/")
         return value.replace("'", "h")
 
     @classmethod
-    def format_key_origin(cls, value):
+    def format_key_origin(cls, value: str):
+        value = value.replace(" ", "").strip()
         if value == "m":
             # handle the special case that the key is the highest key without derivation
             return value
@@ -191,7 +193,7 @@ class SimplePubKeyProvider:
         return value.replace("'", "h")
 
     @classmethod
-    def is_fingerprint_valid(cls, fingerprint):
+    def is_fingerprint_valid(cls, fingerprint: str):
         try:
             int(fingerprint, 16)
             return len(fingerprint) == 8
@@ -199,7 +201,8 @@ class SimplePubKeyProvider:
             return False
 
     @classmethod
-    def format_fingerprint(cls, value):
+    def format_fingerprint(cls, value: str):
+        value = value.replace(" ", "").strip()
         assert cls.is_fingerprint_valid(value)
         return value.upper()
 
