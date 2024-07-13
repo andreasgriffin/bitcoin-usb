@@ -60,13 +60,13 @@ class USBDevice(BaseDevice):
         self.client = None
 
     def bdknetwork_to_chain(self, network: bdk.Network):
-        if network.BITCOIN:
+        if network == bdk.Network.BITCOIN:
             return Chain.MAIN
-        if network.REGTEST:
+        if network == bdk.Network.REGTEST:
             return Chain.REGTEST
-        if network.SIGNET:
+        if network == bdk.Network.SIGNET:
             return Chain.SIGNET
-        if network.TESTNET:
+        if network == bdk.Network.TESTNET:
             return Chain.TEST
 
     def __enter__(self):

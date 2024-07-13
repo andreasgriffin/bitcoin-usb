@@ -285,14 +285,11 @@ class DescriptorInfo:
 
     def get_hwi_descriptor(self, network: bdk.Network):
         # check that the key_origins of the spk_providers are matching the desired output address_type
-        common_key_origins = [
-            address_type.key_origin(network)
-            for address_type in get_all_address_types()
-            if address_type.is_multisig
-        ]
         for spk_provider in self.spk_providers:
-            if spk_provider.key_origin not in common_key_origins:
-                logger.warning(f"{spk_provider.key_origin } is not a common multisig key_origin!")
+            if spk_provider.key_origin != self.address_type.key_origin(network):
+                logger.warning(
+                    f"{spk_provider.key_origin} does not match the default key origin {self.address_type.key_origin(network)} for this address type {self.address_type.name}!"
+                )
 
         if self.address_type.is_multisig:
             assert self.address_type.hwi_descriptor_classes[-1] == MultisigDescriptor
