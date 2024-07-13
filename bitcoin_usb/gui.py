@@ -128,11 +128,13 @@ class USBGui:
                     network=self.network,
                 )
 
+    def set_network(self, network: bdk.Network):
+        self.network = network
+
 
 class MainWindow(QMainWindow):
     def __init__(self, network: bdk.Network):
         super().__init__()
-        self.network = network
         self.usb = USBGui(network=network)
 
         main_widget = QWidget()
@@ -140,8 +142,9 @@ class MainWindow(QMainWindow):
         self.setCentralWidget(main_widget)
 
         self.combo_network = QComboBox(self)
-        self.combo_network.addItems([n.name for n in bdk.Network])
-        self.combo_network.setCurrentText(self.network.name)
+        for n in bdk.Network:
+            self.combo_network.addItem(n.name, userData=n)
+        self.combo_network.setCurrentText(network.name)
         main_widget_layout.addWidget(self.combo_network)
 
         # Create a tab widget and set it as the central widget
@@ -187,8 +190,9 @@ class MainWindow(QMainWindow):
 
         # Initialize the network selection
 
-        self.combo_network.currentIndexChanged.connect(self.switch_network)
-        self.combo_network.setCurrentIndex(0)
+        self.combo_network.currentIndexChanged.connect(
+            lambda idx: self.usb.set_network(bdk.Network[self.combo_network.currentText()])
+        )
 
     def sign_message(self):
         signed_message = self.usb.sign_message(
@@ -206,7 +210,11 @@ class MainWindow(QMainWindow):
 
     def on_button_clicked(self):
         self.xpubs_text_edit.setText("")
-        fingerprint_and_xpus = self.usb.get_fingerprint_and_xpubs()
+        try:
+            fingerprint_and_xpus = self.usb.get_fingerprint_and_xpubs()
+        except Exception as e:
+            print(str(e))
+            return
         if not fingerprint_and_xpus:
             return
         fingerprint, xpubs = fingerprint_and_xpus
@@ -214,13 +222,9 @@ class MainWindow(QMainWindow):
         if xpubs:
             txt = "\n".join(
                 [
-                    f"{str(k)}: [{k.key_origin(self.network).replace('m/',f'{ fingerprint}/')}]  {v}"
+                    f"{str(k)}: [{k.key_origin(self.usb.network).replace('m/',f'{ fingerprint}/')}]  {v}"
                     for k, v in xpubs.items()
                 ]
             )
 
             self.xpubs_text_edit.setText(txt)
-
-    def switch_network(self, idx):
-        networks = [n for n in bdk.Network]
-        self.network = networks[idx]

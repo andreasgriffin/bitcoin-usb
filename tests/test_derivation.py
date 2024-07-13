@@ -171,4 +171,7 @@ def test_multisig_unusual_key_origin(caplog):
         == "wsh(sortedmulti(2,[7c85f2b5/44h/1h/0h]tpubDCwGRkTC8E2QbbUPZvpXQad4zRHqo24YTJpAFDtJh1x6nTBojiKTorqCm2JQdnDEwLruKry8NTont7tG6jqZCFnp5c2evppfedDdRRAJxrX/0/*,[34be20d9/48h/1h/0h/2h]tpubDEGiMrEBpyW7ebPDipDBwgxi4Ct4VqDApRcDEZy6uT8HoE5jUduJiXH7axkuQdcf7ZGamBbng7Ym3MPwLHqkugswt1uCParZBGyGsfEZ7PQ/0/*,[3b8adfc3/48h/1h/0h/2h]tpubDEmjAPbjr9QfDidVmgSGdK6JYXiFy1xw9pVmXXSbZxa8qz2ixtZhaRyLdMS3wwECPao4PRC4dGWXnpwnzGUAaVewbW9VtkYaMg4neeTFLm6/0/*))"
     )
 
-    assert "m/44h/1h/0h is not a common multisig key_origin!" == caplog.records[-1].message
+    assert (
+        "m/44h/1h/0h does not match the default key origin m/48h/1h/0h/2h for this address type Multi Sig (SegWit/p2wsh)!"
+        == caplog.records[-1].message
+    )
