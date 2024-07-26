@@ -21,6 +21,17 @@ from .address_types import (
 )
 
 
+def bdknetwork_to_chain(network: bdk.Network):
+    if network == bdk.Network.BITCOIN:
+        return Chain.MAIN
+    if network == bdk.Network.REGTEST:
+        return Chain.REGTEST
+    if network == bdk.Network.SIGNET:
+        return Chain.SIGNET
+    if network == bdk.Network.TESTNET:
+        return Chain.TEST
+
+
 class BaseDevice(ABC):
     def __init__(self, network: bdk.Network) -> None:
         self.network = network
@@ -59,22 +70,12 @@ class USBDevice(BaseDevice):
         self.lock = threading.Lock()
         self.client = None
 
-    def bdknetwork_to_chain(self, network: bdk.Network):
-        if network == bdk.Network.BITCOIN:
-            return Chain.MAIN
-        if network == bdk.Network.REGTEST:
-            return Chain.REGTEST
-        if network == bdk.Network.SIGNET:
-            return Chain.SIGNET
-        if network == bdk.Network.TESTNET:
-            return Chain.TEST
-
     def __enter__(self):
         self.lock.acquire()
         self.client = hwi_commands.get_client(
             device_type=self.selected_device["type"],
             device_path=self.selected_device["path"],
-            chain=self.bdknetwork_to_chain(self.network),
+            chain=bdknetwork_to_chain(self.network),
         )
         return self
 
