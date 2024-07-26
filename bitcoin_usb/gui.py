@@ -17,7 +17,7 @@ from PyQt6.QtWidgets import (
 
 from bitcoin_usb.address_types import AddressType
 
-from .device import USBDevice
+from .device import USBDevice, bdknetwork_to_chain
 
 
 class DeviceDialog(QDialog):
@@ -64,13 +64,26 @@ class InfoDialog(QDialog):
 
 
 class USBGui:
-    def __init__(self, network: bdk.Network, autoselect_if_1_device=False, parent=None) -> None:
+    def __init__(
+        self,
+        network: bdk.Network,
+        allow_emulators_only_for_testnet_works: bool = True,
+        autoselect_if_1_device=False,
+        parent=None,
+    ) -> None:
         self.autoselect_if_1_device = autoselect_if_1_device
         self.network = network
         self.parent = parent
+        self.allow_emulators_only_for_testnet_works = allow_emulators_only_for_testnet_works
 
     def get_device(self) -> Dict:
-        devices = hwi_commands.enumerate()
+        allow_emulators = True
+        if self.allow_emulators_only_for_testnet_works:
+            allow_emulators = self.network in [bdk.Network.REGTEST, bdk.Network.TESTNET, bdk.Network.SIGNET]
+
+        devices = hwi_commands.enumerate(
+            allow_emulators=allow_emulators, chain=bdknetwork_to_chain(self.network)
+        )
         if not devices:
             InfoDialog("No USB devices found", title="USB Devices").exec()
             return {}
