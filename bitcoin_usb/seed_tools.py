@@ -11,19 +11,6 @@ logger = logging.getLogger(__name__)
 from .address_types import SimplePubKeyProvider
 
 
-def key_origin_fits_network(key_origin: str, network: bdk.Network):
-    network_str = key_origin.split("/")[2]
-    assert network_str.endswith("h")
-    network_index = int(network_str.replace("h", ""))
-
-    if network_index == 0:
-        return network == bdk.Network.BITCOIN
-    elif network_index == 1:
-        return network != bdk.Network.BITCOIN
-    else:
-        raise ValueError(f"Unknown network/coin type {network_str} in {key_origin}")
-
-
 def get_mnemonic_seed(mnemonic: str):
     mnemo = Mnemonic("english")
     if not mnemo.check(mnemonic):
@@ -47,8 +34,6 @@ def derive(mnemonic: str, key_origin: str, network: bdk.Network) -> Tuple[str, s
     Returns:
         Tuple[str, str]: xpub, fingerprint  (where fingerprint is the master fingerprint)
     """
-    if not key_origin_fits_network(key_origin, network):
-        raise ValueError(f"{key_origin} does not fit the selected network {network}")
 
     # Select network parameters
     network_params = {
@@ -64,11 +49,13 @@ def derive(mnemonic: str, key_origin: str, network: bdk.Network) -> Tuple[str, s
     # Create a master extended key from the seed
     master_key = CCoinExtKey.from_seed(seed_bytes)
 
-    # Derive the xpub at the specified origin
-    derived_key = master_key.derive_path(key_origin)
+    if key_origin == "m":
+        derived_key = master_key
+    else:
+        # Derive the xpub at the specified origin
+        derived_key = master_key.derive_path(key_origin)
 
     # Extract xpub
-
     xpub = str(derived_key.neuter())
 
     # Get the fingerprint

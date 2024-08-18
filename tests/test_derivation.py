@@ -1,5 +1,3 @@
-import pytest
-
 from bitcoin_usb.address_types import (
     AddressTypes,
     DescriptorInfo,
@@ -7,7 +5,7 @@ from bitcoin_usb.address_types import (
     get_all_address_types,
     logging,
 )
-from bitcoin_usb.seed_tools import derive, derive_spk_provider
+from bitcoin_usb.seed_tools import derive_spk_provider
 
 # test seeds
 # seed1: spider manual inform reject arch raccoon betray moon document across main build
@@ -61,6 +59,56 @@ def test_correct_p2sh_p2wsh_derivation():
     assert spk_provider.fingerprint == "7c85f2b5".upper()
 
 
+def test_unusual_derivations():
+    #######
+    key_origin = "m"
+    spk_provider = derive_spk_provider(
+        "spider manual inform reject arch raccoon betray moon document across main build",
+        key_origin,
+        network,
+    )
+    print(spk_provider)
+    assert spk_provider.key_origin == key_origin
+    assert (
+        spk_provider.xpub
+        == "tpubD6NzVbkrYhZ4YjD4x8pv3PDE9bzSdF6FLsCroncohJbjpx4X9KykvHvZt2E2ybcrAuiNXWkVMt8TuJxYV7YMcgkfytvjMoCssXpL6pUp4Sc"
+    )
+    # compared with sparrow
+    assert spk_provider.fingerprint == "7c85f2b5".upper()
+
+    #######
+    key_origin = "m/1234567"
+    spk_provider = derive_spk_provider(
+        "spider manual inform reject arch raccoon betray moon document across main build",
+        key_origin,
+        network,
+    )
+    print(spk_provider)
+    assert spk_provider.key_origin == key_origin
+    assert (
+        spk_provider.xpub
+        == "tpubD9BDKDcxLHML2kmMeCuMF5QBETNQncf35TnwPvC5qhtLZupbxLEa4mhrpZZzfgmL8cxVTVUhgmUticQNWipZd19zatMmwg7LLgYjmFkqXpM"
+    )
+    # compared with sparrow
+    assert spk_provider.fingerprint == "7c85f2b5".upper()
+
+    #######
+    key_origin = "m/1234567/0h/1"
+    spk_provider = derive_spk_provider(
+        "spider manual inform reject arch raccoon betray moon document across main build",
+        key_origin,
+        network,
+    )
+    print(spk_provider)
+    assert spk_provider.key_origin == key_origin
+    assert (
+        spk_provider.xpub
+        == "tpubDDXENRdKZmizWdFbbgVf37n9zZ6yykSUdLYfhoPG2ubUgBVaUShGvdU17BPRwNNtLRrt8jVayR96JoW8yg9TdDo9tg7LeCWCqJ9V7NFnQqL"
+    )
+    # compared with sparrow
+    assert spk_provider.fingerprint == "7c85f2b5".upper()
+
+
 def test_correct_p2wsh_derivation():
     spk_provider = derive_spk_provider(
         "spider manual inform reject arch raccoon betray moon document across main build",
@@ -105,16 +153,6 @@ def test_correct_84derivation():
         == "tpubDCPkYWRWsTRZji1938hvWzdDsfQ39aasHz47s3htaKyYSHGdZBoNynBzwQsFS4xn4X4basMr1qL3DcPbjhcVNCzLzGhLoZixu2CAke9Q3hK"
     )
     assert spk_provider.fingerprint == "7c85f2b5".upper()
-
-
-def test_wrong_network():
-    with pytest.raises(ValueError) as exc_info:
-        xpub, fingerprint = derive(
-            "spider manual inform reject arch raccoon betray moon document across main build",
-            "m/48h/0h/0h/2h",
-            network,
-        )
-    assert str(exc_info.value) == "m/48h/0h/0h/2h does not fit the selected network Network.REGTEST"
 
 
 def test_multisig():
