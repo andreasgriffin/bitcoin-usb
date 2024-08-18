@@ -5,7 +5,7 @@ from bitcoin_usb.address_types import (
     get_all_address_types,
     logging,
 )
-from bitcoin_usb.seed_tools import derive_spk_provider
+from bitcoin_usb.seed_tools import derive_spk_provider, get_network_index
 
 # test seeds
 # seed1: spider manual inform reject arch raccoon betray moon document across main build
@@ -213,3 +213,12 @@ def test_multisig_unusual_key_origin(caplog):
         "m/44h/1h/0h does not match the default key origin m/48h/1h/0h/2h for this address type Multi Sig (SegWit/p2wsh)!"
         == caplog.records[-1].message
     )
+
+
+def test_get_network_index():
+    assert get_network_index("m/48h/0h/0h/2h") == 0
+    assert get_network_index("m/48h/1h/0h/2h") == 1
+
+    assert get_network_index("m/48h/1/0h/2h") == None
+
+    assert get_network_index("m/4") == None
