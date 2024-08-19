@@ -23,6 +23,10 @@ class SoftwareSigner(BaseDevice):
         super().__init__(network=network)
         self.mnemonic = mnemonic
 
+    def derive(self, key_origin: str):
+        xpub, fingerprint = derive(self.mnemonic, key_origin, self.network)
+        return xpub
+
     def get_fingerprint(self) -> str:
         # it doesn't mattrer which AddressTypes i choose, because the fingerprint is identical for all
         address_type = AddressTypes.p2wsh

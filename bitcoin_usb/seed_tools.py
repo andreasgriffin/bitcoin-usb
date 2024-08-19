@@ -1,5 +1,5 @@
 import logging
-from typing import Tuple
+from typing import Optional, Tuple
 
 import bdkpython as bdk
 from bitcointx import select_chain_params
@@ -11,17 +11,19 @@ logger = logging.getLogger(__name__)
 from .address_types import SimplePubKeyProvider
 
 
-def key_origin_fits_network(key_origin: str, network: bdk.Network):
-    network_str = key_origin.split("/")[2]
-    assert network_str.endswith("h")
-    network_index = int(network_str.replace("h", ""))
+def get_network_index(key_origin: str) -> Optional[int]:
+    splitted = key_origin.split("/")
+    if len(splitted) < 3:
+        logger.warning(f"{key_origin} has too few levels for a network_index")
+        return None
 
-    if network_index == 0:
-        return network == bdk.Network.BITCOIN
-    elif network_index == 1:
-        return network != bdk.Network.BITCOIN
-    else:
-        raise ValueError(f"Unknown network/coin type {network_str} in {key_origin}")
+    network_str = splitted[2]
+    if not network_str.endswith("h"):
+        logger.warning(f"The network index ({network_str}) must be hardened")
+        return None
+
+    network_index = int(network_str.replace("h", ""))
+    return network_index
 
 
 def get_mnemonic_seed(mnemonic: str):
@@ -47,8 +49,6 @@ def derive(mnemonic: str, key_origin: str, network: bdk.Network) -> Tuple[str, s
     Returns:
         Tuple[str, str]: xpub, fingerprint  (where fingerprint is the master fingerprint)
     """
-    if not key_origin_fits_network(key_origin, network):
-        raise ValueError(f"{key_origin} does not fit the selected network {network}")
 
     # Select network parameters
     network_params = {
@@ -64,11 +64,13 @@ def derive(mnemonic: str, key_origin: str, network: bdk.Network) -> Tuple[str, s
     # Create a master extended key from the seed
     master_key = CCoinExtKey.from_seed(seed_bytes)
 
-    # Derive the xpub at the specified origin
-    derived_key = master_key.derive_path(key_origin)
+    if key_origin == "m":
+        derived_key = master_key
+    else:
+        # Derive the xpub at the specified origin
+        derived_key = master_key.derive_path(key_origin)
 
     # Extract xpub
-
     xpub = str(derived_key.neuter())
 
     # Get the fingerprint
