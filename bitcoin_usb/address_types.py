@@ -185,7 +185,12 @@ class SimplePubKeyProvider:
 
     @classmethod
     def format_key_origin(cls, value: str):
-        value = value.replace(" ", "").strip()
+        def filter_characters(s):
+            allowed_chars = set("m/'h0123456789")
+            filtered_string = "".join(c for c in s if c in allowed_chars)
+            return filtered_string
+
+        value = filter_characters(value.strip())
         if value == "m":
             # handle the special case that the key is the highest key without derivation
             return value
