@@ -100,9 +100,6 @@ class SoftwareSigner(BaseDevice):
 
     def display_address(
         self,
-        descriptor_str: str,
-        keychain: bdk.KeychainKind,
-        address_index: int,
-        network: bdk.Network,
+        address_descriptor: str,
     ):
         pass

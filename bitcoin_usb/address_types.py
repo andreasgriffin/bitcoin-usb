@@ -1,5 +1,7 @@
 import logging
 
+from bitcoin_usb.i18n import translate
+
 logger = logging.getLogger(__name__)
 
 from typing import Callable, Dict, List, Optional
@@ -159,7 +161,11 @@ def get_hwi_address_type(address_type: AddressType) -> HWIAddressType:
     if address_type.name in [AddressTypes.p2tr.name]:
         return HWIAddressType.TAP
 
-    raise ValueError(f"No HWI AddressType could be found for {address_type.name}")
+    raise ValueError(
+        translate("bitcoin_usb", "No HWI AddressType could be found for {name}").format(
+            name=address_type.name
+        )
+    )
 
 
 class SimplePubKeyProvider:
@@ -178,24 +184,41 @@ class SimplePubKeyProvider:
         self.derivation_path = self.format_derivation_path(derivation_path)
 
     @classmethod
-    def format_derivation_path(cls, value: str):
+    def format_derivation_path(cls, value: str) -> str:
         value = value.replace(" ", "").strip()
-        assert value.startswith("/")
+        if not value.startswith("/"):
+            raise ValueError(
+                translate("bitcoin_usb", "derivation_path {value} must start with a /").format(value=value)
+            )
         return value.replace("'", "h")
 
     @classmethod
-    def format_key_origin(cls, value: str):
+    def format_key_origin(cls, value: str) -> str:
         def filter_characters(s):
             allowed_chars = set("m/'h0123456789")
             filtered_string = "".join(c for c in s if c in allowed_chars)
             return filtered_string
 
-        value = filter_characters(value.strip())
+        value = filter_characters(value.replace("'", "h").strip())
         if value == "m":
             # handle the special case that the key is the highest key without derivation
             return value
-        assert value.startswith("m/"), "The value must start with m/"
-        return value.replace("'", "h")
+
+        for group in value.split("/"):
+            if group.count("h") > 1:
+                raise ValueError(translate("bitcoin_usb", "h cannot appear twice in a index"))
+
+        if not value.startswith("m/"):
+            raise ValueError(translate("bitcoin_usb", "{value} must start with m/").format(value=value))
+        if "//" in value:
+            raise ValueError(translate("bitcoin_usb", "{value} cannot contain //").format(value=value))
+        if "/h" in value:
+            raise ValueError(translate("bitcoin_usb", "{value} cannot contain /h").format(value=value))
+        if "hh" in value:
+            raise ValueError(translate("bitcoin_usb", "{value} cannot contain hh").format(value=value))
+        if value.endswith("/"):
+            raise ValueError(translate("bitcoin_usb", "{value} cannot end with /").format(value=value))
+        return value
 
     @classmethod
     def is_fingerprint_valid(cls, fingerprint: str):
@@ -206,9 +229,12 @@ class SimplePubKeyProvider:
             return False
 
     @classmethod
-    def format_fingerprint(cls, value: str):
+    def format_fingerprint(cls, value: str) -> str:
         value = value.replace(" ", "").strip()
-        assert cls.is_fingerprint_valid(value)
+        if not cls.is_fingerprint_valid(value):
+            raise ValueError(
+                translate("bitcoin_usb", "{value} is not a valid fingerprint").format(value=value)
+            )
         return value.upper()
 
     def clone(self) -> "SimplePubKeyProvider":
@@ -216,7 +242,13 @@ class SimplePubKeyProvider:
 
     def is_testnet(self):
         network_str = self.key_origin.split("/")[2]
-        assert network_str.endswith("h")
+        if not network_str.endswith("h"):
+            raise ValueError(
+                translate(
+                    "bitcoin_usb",
+                    "The network part {network_str} of the key origin {key_origin} must be hardened with a h",
+                ).format(network_str=network_str, key_origin=self.key_origin)
+            )
         network_index = int(network_str.replace("h", ""))
         if network_index == 0:
             return False
@@ -224,7 +256,11 @@ class SimplePubKeyProvider:
             return True
         else:
             # https://learnmeabitcoin.com/technical/derivation-paths
-            raise ValueError(f"Unknown network/coin type {network_str} in {self.key_origin}")
+            raise ValueError(
+                translate("bitcoin_usb", "Unknown network/coin type {network_str} in {key_origin}").format(
+                    network_str=network_str, key_origin=self.key_origin
+                )
+            )
 
     @classmethod
     def from_hwi(cls, pubkey_provider: PubkeyProvider) -> "SimplePubKeyProvider":
