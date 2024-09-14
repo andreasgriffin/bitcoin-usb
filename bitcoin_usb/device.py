@@ -55,10 +55,7 @@ class BaseDevice(ABC):
     @abstractmethod
     def display_address(
         self,
-        descriptor_str: str,
-        keychain: bdk.KeychainKind,
-        address_index: int,
-        network: bdk.Network,
+        address_descriptor: str,
     ) -> str:
         pass
 
@@ -117,17 +114,15 @@ class USBDevice(BaseDevice):
 
     def display_address(
         self,
-        descriptor_str: str,
-        keychain: bdk.KeychainKind,
-        address_index: int,
-        network: bdk.Network,
+        address_descriptor: str,
     ) -> str:
+        "Requires to have 1 derivation_path, like '/0/0', not '/<0;1>/*', and not '/0/*'"
         assert self.client
-        desc_infos = DescriptorInfo.from_str(descriptor_str)
+        desc_infos = DescriptorInfo.from_str(address_descriptor)
 
         if desc_infos.address_type.is_multisig:
             pubkey_providers = [
-                signer_info.to_hwi_pubkey_provider() for signer_info in desc_infos.spk_provider
+                spk_provider.to_hwi_pubkey_provider() for spk_provider in desc_infos.spk_providers
             ]
             return self.client.display_multisig_address(
                 get_hwi_address_type(desc_infos.address_type),
@@ -138,7 +133,8 @@ class USBDevice(BaseDevice):
                 ),
             )
         else:
+            bip32_path = desc_infos.spk_providers[0].derivation_path[1:].split("/")
             return self.client.display_singlesig_address(
-                desc_infos.address_type.get_bip32_path(network, keychain, address_index),
+                f"m{bip32_path}",
                 get_hwi_address_type(desc_infos.address_type),
             )

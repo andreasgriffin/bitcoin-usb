@@ -43,20 +43,28 @@ def test_SimplePubKeyProvider():
     assert SimplePubKeyProvider.format_derivation_path("/<0; 1>/ *") == "/<0;1>/*"
 
     assert SimplePubKeyProvider.format_key_origin(" m /   48' / 1' / 1' / 2' ") == "m/48h/1h/1h/2h"
-    with pytest.raises(AssertionError):
+    with pytest.raises(ValueError):
         SimplePubKeyProvider.format_key_origin(" / 48' / 1' / 1' / 2' ")
-    with pytest.raises(AssertionError):
+    with pytest.raises(ValueError):
         SimplePubKeyProvider.format_key_origin("  48' / m/ 1' / 1' / 2' ")
+    with pytest.raises(ValueError):
+        SimplePubKeyProvider.format_key_origin("m/48hh/1h/1h/2h")
+    with pytest.raises(ValueError):
+        SimplePubKeyProvider.format_key_origin("m/h/1h/1h/2h")
+    with pytest.raises(ValueError):
+        SimplePubKeyProvider.format_key_origin("m/h4/1h/1h/2h")
+    with pytest.raises(ValueError):
+        SimplePubKeyProvider.format_key_origin("m/1h1h4/1h/1h/2h")
 
     assert SimplePubKeyProvider.format_fingerprint(" 1 " * 8) == "11111111"
     assert SimplePubKeyProvider.format_fingerprint("a" * 8)
-    with pytest.raises(AssertionError):
+    with pytest.raises(ValueError):
         assert SimplePubKeyProvider.format_fingerprint("1" * 7)
-    with pytest.raises(AssertionError):
+    with pytest.raises(ValueError):
         assert SimplePubKeyProvider.format_fingerprint("1" * 2)
-    with pytest.raises(AssertionError):
+    with pytest.raises(ValueError):
         assert SimplePubKeyProvider.format_fingerprint("1" * 9)
-    with pytest.raises(AssertionError):
+    with pytest.raises(ValueError):
         assert SimplePubKeyProvider.format_fingerprint("h" * 8)
 
     assert SimplePubKeyProvider("xpub1234", "11111111", "m/48h/1h/1h/2h").is_testnet()
