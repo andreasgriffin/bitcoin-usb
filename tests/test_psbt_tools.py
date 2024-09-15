@@ -1,5 +1,5 @@
 from bitcoin_usb.address_types import bdk
-from bitcoin_usb.psbt_finalizer import PSBTFinalizer
+from bitcoin_usb.psbt_tools import PSBTTools
 
 # test seeds
 # seed1: spider manual inform reject arch raccoon betray moon document across main build
@@ -24,7 +24,7 @@ p2wsh_2_2of3 = bdk.PartiallySignedTransaction(
 
 
 def test_finalize():
-    result = PSBTFinalizer.finalize(p2wsh_2_2of3)
+    result = PSBTTools.finalize(p2wsh_2_2of3)
     assert result
     assert (
         bytes(result.serialize()).hex()
@@ -33,5 +33,29 @@ def test_finalize():
 
 
 def test_not_finalize():
-    assert PSBTFinalizer.finalize(p2wsh_psbt_0_2of3) is None
-    assert PSBTFinalizer.finalize(p2wsh_psbt_1_2of3) is None
+    assert PSBTTools.finalize(p2wsh_psbt_0_2of3) is None
+    assert PSBTTools.finalize(p2wsh_psbt_1_2of3) is None
+
+
+def test_add_global_xpub_dict_to_psbt():
+
+    psbt = bdk.PartiallySignedTransaction(
+        "cHNidP8BAF4BAAAAAfdk4zC0Q0AECA2S/SRaPYbPQYPHW5H1GXI/9EPHJ5j8AQAAAAD9////AaASAAAAAAAAIgAgEnKktqfcmkwrjKR4vIUBRNZ5GPqAIaGkeqS2/cszbbmIjSwAAAEA9gIAAAAAAQHyOroOo+Sg03YDj1v2WocM/s7/IItULOstJ3WrTJU7mAAAAAAA/f///wLweNABAAAAACJRIChApUTf0nxumzCIO0+zBZOCzXVuotrfs5zvuboG1P6fJBMAAAAAAAAiACBSFeyza7f9uEZNjlO9CDULe2FRQK2R5IfXeQNZArtyuAJHMEQCIDpTnuwTX3eEUqnzBTr2f8/nJdHx3Ro+PAWI0qsT5pxAAiBvkKgjZHG5VItXMoeSmGX7iRXPz1NApl6mJGoHN4DxhAEhAujXnKMmVZ/XdfhVXk4MTAu7xW36IVdPLbV+AzXiFC8zho0sAAEBKyQTAAAAAAAAIgAgUhXss2u3/bhGTY5TvQg1C3thUUCtkeSH13kDWQK7crgBBUdRIQL1GFTyyXMxj3q85INfFGeyhDcSx/TrBOhWSmGbu27U5SEDoQl/zDwZKjaOapZlydMu0iXK57cERiGaVFRsZVG4PHNSriIGAvUYVPLJczGPerzkg18UZ7KENxLH9OsE6FZKYZu7btTlHPVZHuwwAACAAQAAgAAAAIACAACAAAAAAAAAAAAiBgOhCX/MPBkqNo5qlmXJ0y7SJcrntwRGIZpUVGxlUbg8cxynVlM6MAAAgAEAAIAAAACAAgAAgAAAAAAAAAAAAAEBR1EhAlKiBTk144VfUh/8Y9Vq0obNUMYzxARXdzaSp8biculGIQK6d1/ffptvWDOvKpqRILg5K4SsTnVPTBwMpgd9yYCMxFKuIgICUqIFOTXjhV9SH/xj1WrShs1QxjPEBFd3NpKnxuJy6UYc9Vke7DAAAIABAACAAAAAgAIAAIAAAAAAAgAAACICArp3X99+m29YM68qmpEguDkrhKxOdU9MHAymB33JgIzEHKdWUzowAACAAQAAgAAAAIACAACAAAAAAAIAAAAA"
+    )
+
+    expected_result = "cHNidP8BAF4BAAAAAfdk4zC0Q0AECA2S/SRaPYbPQYPHW5H1GXI/9EPHJ5j8AQAAAAD9////AaASAAAAAAAAIgAgEnKktqfcmkwrjKR4vIUBRNZ5GPqAIaGkeqS2/cszbbmIjSwATwEENYfPBALjj9eAAAAC3TPQjKoHDgjow4mhvYjct5eM+vtSc1n0WG52hE8K/XYCCB42Epf2sL/ZAtcHNJEKYEs9repV6BT1RR+mBFErir8Up1ZTOjAAAIABAACAAAAAgAIAAIBPAQQ1h88E8fAhO4AAAALWK+1nSLbMBn+ty4ArGBmqXkgGAQ7XgWcRmGw+Cao4DQL3WvfeQ5an/If7nSgXQWA8Yq1maXVRZFThyTpn7ujhThT1WR7sMAAAgAEAAIAAAACAAgAAgAABAPYCAAAAAAEB8jq6DqPkoNN2A49b9lqHDP7O/yCLVCzrLSd1q0yVO5gAAAAAAP3///8C8HjQAQAAAAAiUSAoQKVE39J8bpswiDtPswWTgs11bqLa37Oc77m6BtT+nyQTAAAAAAAAIgAgUhXss2u3/bhGTY5TvQg1C3thUUCtkeSH13kDWQK7crgCRzBEAiA6U57sE193hFKp8wU69n/P5yXR8d0aPjwFiNKrE+acQAIgb5CoI2RxuVSLVzKHkphl+4kVz89TQKZepiRqBzeA8YQBIQLo15yjJlWf13X4VV5ODEwLu8Vt+iFXTy21fgM14hQvM4aNLAABASskEwAAAAAAACIAIFIV7LNrt/24Rk2OU70INQt7YVFArZHkh9d5A1kCu3K4AQVHUSEC9RhU8slzMY96vOSDXxRnsoQ3Esf06wToVkphm7tu1OUhA6EJf8w8GSo2jmqWZcnTLtIlyue3BEYhmlRUbGVRuDxzUq4iBgL1GFTyyXMxj3q85INfFGeyhDcSx/TrBOhWSmGbu27U5Rz1WR7sMAAAgAEAAIAAAACAAgAAgAAAAAAAAAAAIgYDoQl/zDwZKjaOapZlydMu0iXK57cERiGaVFRsZVG4PHMcp1ZTOjAAAIABAACAAAAAgAIAAIAAAAAAAAAAAAABAUdRIQJSogU5NeOFX1If/GPVatKGzVDGM8QEV3c2kqfG4nLpRiECundf336bb1gzryqakSC4OSuErE51T0wcDKYHfcmAjMRSriICAlKiBTk144VfUh/8Y9Vq0obNUMYzxARXdzaSp8biculGHPVZHuwwAACAAQAAgAAAAIACAACAAAAAAAIAAAAiAgK6d1/ffptvWDOvKpqRILg5K4SsTnVPTBwMpgd9yYCMxBynVlM6MAAAgAEAAIAAAACAAgAAgAAAAAACAAAAAA=="
+    global_xpub = {
+        "tpubDDvmMkjb6fsik7MPwtDUBHHNKNKBet72s1xR5FWNzMyc898uDbXARk9sxbkt4DHG7GuhzLXVGyhW6G23nVe1yr7CK4XNvv7LYu3sM2hCP9P": (
+            "a756533a",
+            "m/48'/1'/0'/2'",
+        ),
+        "tpubDFgg66kTzPQMrNvghB2TcVhXBhFx8qkmBip9FEpJzLKK9uYuFinwxzpXuWrxydAKWQc1diLBvUi7k8ZDCV7HfZKJqMUG3Kvj6GMaFsXZGtc": (
+            "f5591eec",
+            "m/48'/1'/0'/2'",
+        ),
+    }
+
+    psbt_new = PSBTTools.add_global_xpub_dict_to_psbt(psbt, global_xpub, bdk.Network.TESTNET)
+
+    assert psbt_new.serialize() == expected_result
+    assert psbt_new.extract_tx().txid() == psbt.extract_tx().txid()
