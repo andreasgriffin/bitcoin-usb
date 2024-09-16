@@ -1,56 +1,23 @@
+import logging
 import platform
-from typing import Dict, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 import bdkpython as bdk
 import hwilib.commands as hwi_commands
-from PyQt6.QtWidgets import QDialog, QMessageBox, QPushButton, QVBoxLayout
+from PyQt6.QtCore import QObject
+from PyQt6.QtWidgets import QMessageBox, QPushButton
 
 from bitcoin_usb.address_types import AddressType
+from bitcoin_usb.dialogs import DeviceDialog, ThreadedWaitingDialog, get_message_box
 from bitcoin_usb.udevwrapper import UDevWrapper
 
 from .device import USBDevice, bdknetwork_to_chain
 from .i18n import translate
 
-
-def get_message_box(
-    text: str, icon: QMessageBox.Icon = QMessageBox.Icon.Information, title: str = ""
-) -> QMessageBox:
-    # Create the text box
-    msg_box = QMessageBox()
-    msg_box.setIcon(icon)
-    msg_box.setText(text)
-    msg_box.setWindowTitle(title)
-
-    # Add standard buttons
-    msg_box.setStandardButtons(QMessageBox.StandardButton.Ok)
-
-    return msg_box
+logger = logging.getLogger(__name__)
 
 
-class DeviceDialog(QDialog):
-    def __init__(self, parent, devices, network):
-        super().__init__(parent)
-        self.setWindowTitle(self.tr("Select the detected device"))
-        self.layout = QVBoxLayout(self)
-
-        # Creating a button for each device
-        for device in devices:
-            button = QPushButton(f"{device['type']} - {device['model']}", self)
-            button.clicked.connect(lambda *args, d=device: self.select_device(d))
-            self.layout.addWidget(button)
-
-        self.selected_device = None
-        self.network = network
-
-    def select_device(self, device):
-        self.selected_device = device
-        self.accept()
-
-    def get_selected_device(self):
-        return self.selected_device
-
-
-class USBGui:
+class USBGui(QObject):
     def __init__(
         self,
         network: bdk.Network,
@@ -68,9 +35,22 @@ class USBGui:
         if self.allow_emulators_only_for_testnet_works:
             allow_emulators = self.network in [bdk.Network.REGTEST, bdk.Network.TESTNET, bdk.Network.SIGNET]
 
-        devices = hwi_commands.enumerate(
-            allow_emulators=allow_emulators, chain=bdknetwork_to_chain(self.network)
-        )
+        def hwi_enumerate() -> List[Dict[str, Any]]:
+            devices = []
+            try:
+                devices = hwi_commands.enumerate(
+                    allow_emulators=allow_emulators, chain=bdknetwork_to_chain(self.network)
+                )
+            except Exception as e:
+                logger.error(str(e))
+            return devices
+
+        devices = ThreadedWaitingDialog(
+            func=hwi_enumerate,
+            title=self.tr("Unlock USB devices"),
+            message=self.tr("Please unlock USB devices"),
+        ).get_result()
+
         if not devices:
             get_message_box(
                 translate("bitcoin_usb", "No USB devices found"),
@@ -96,6 +76,7 @@ class USBGui:
             return None
 
         try:
+
             with USBDevice(selected_device, self.network) as dev:
                 return dev.sign_psbt(psbt)
         except Exception as e:
@@ -104,27 +85,27 @@ class USBGui:
 
         return None
 
-    def get_fingerprint_and_xpubs(self) -> Optional[Tuple[str, Dict[AddressType, str]]]:
+    def get_fingerprint_and_xpubs(self) -> Optional[Tuple[Dict[str, Any], str, Dict[AddressType, str]]]:
         selected_device = self.get_device()
         if not selected_device:
             return None
 
         try:
             with USBDevice(selected_device, self.network) as dev:
-                return dev.get_fingerprint(), dev.get_xpubs()
+                return selected_device, dev.get_fingerprint(), dev.get_xpubs()
         except Exception as e:
             if not self.handle_exception_get_fingerprint_and_xpubs(e):
                 raise
         return None
 
-    def get_fingerprint_and_xpub(self, key_origin: str) -> Optional[Tuple[str, str]]:
+    def get_fingerprint_and_xpub(self, key_origin: str) -> Optional[Tuple[Dict[str, Any], str, str]]:
         selected_device = self.get_device()
         if not selected_device:
             return None
 
         try:
             with USBDevice(selected_device, self.network) as dev:
-                return dev.get_fingerprint(), dev.get_xpub(key_origin)
+                return selected_device, dev.get_fingerprint(), dev.get_xpub(key_origin)
         except Exception as e:
             if not self.handle_exception_get_fingerprint_and_xpubs(e):
                 raise
