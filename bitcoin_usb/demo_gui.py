@@ -111,7 +111,7 @@ class MainWindow(QMainWindow):
 
         if not fingerprint_and_xpus:
             return
-        fingerprint, xpubs = fingerprint_and_xpus
+        device, fingerprint, xpubs = fingerprint_and_xpus
 
         if xpubs:
             txt = "\n".join(
