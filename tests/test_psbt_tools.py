@@ -24,7 +24,7 @@ p2wsh_2_2of3 = bdk.PartiallySignedTransaction(
 
 
 def test_finalize():
-    result = PSBTTools.finalize(p2wsh_2_2of3)
+    result = PSBTTools.finalize(p2wsh_2_2of3, network=network)
     assert result
     assert (
         bytes(result.serialize()).hex()
@@ -33,8 +33,8 @@ def test_finalize():
 
 
 def test_not_finalize():
-    assert PSBTTools.finalize(p2wsh_psbt_0_2of3) is None
-    assert PSBTTools.finalize(p2wsh_psbt_1_2of3) is None
+    assert PSBTTools.finalize(p2wsh_psbt_0_2of3, network=network) is None
+    assert PSBTTools.finalize(p2wsh_psbt_1_2of3, network=network) is None
 
 
 def test_add_global_xpub_dict_to_psbt():
