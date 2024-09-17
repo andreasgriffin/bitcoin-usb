@@ -3,15 +3,15 @@ import platform
 from typing import Any, Dict, List, Optional, Tuple
 
 import bdkpython as bdk
-import hwilib.commands as hwi_commands
 from PyQt6.QtCore import QObject
 from PyQt6.QtWidgets import QMessageBox, QPushButton
 
 from bitcoin_usb.address_types import AddressType
 from bitcoin_usb.dialogs import DeviceDialog, ThreadedWaitingDialog, get_message_box
+from bitcoin_usb.hwi_quick import HWIQuick
 from bitcoin_usb.udevwrapper import UDevWrapper
 
-from .device import USBDevice, bdknetwork_to_chain
+from .device import USBDevice
 from .i18n import translate
 
 logger = logging.getLogger(__name__)
@@ -30,26 +30,36 @@ class USBGui(QObject):
         self.parent = parent
         self.allow_emulators_only_for_testnet_works = allow_emulators_only_for_testnet_works
 
-    def get_device(self) -> Dict:
-        allow_emulators = True
-        if self.allow_emulators_only_for_testnet_works:
-            allow_emulators = self.network in [bdk.Network.REGTEST, bdk.Network.TESTNET, bdk.Network.SIGNET]
+    def get_devices(self, slow_hwi_listing=False) -> List[Dict[str, Any]]:
+        "Returns the found devices WITHOUT unlocking them first.  Misses the fingerprints"
+        allow_emulators = False
+        devices = []
 
-        def hwi_enumerate() -> List[Dict[str, Any]]:
-            devices = []
-            try:
-                devices = hwi_commands.enumerate(
-                    allow_emulators=allow_emulators, chain=bdknetwork_to_chain(self.network)
-                )
-            except Exception as e:
-                logger.error(str(e))
-            return devices
+        try:
+            if slow_hwi_listing:
+                allow_emulators = True
+                if self.allow_emulators_only_for_testnet_works:
+                    allow_emulators = self.network in [
+                        bdk.Network.REGTEST,
+                        bdk.Network.TESTNET,
+                        bdk.Network.SIGNET,
+                    ]
 
-        devices = ThreadedWaitingDialog(
-            func=hwi_enumerate,
-            title=self.tr("Unlock USB devices"),
-            message=self.tr("Please unlock USB devices"),
-        ).get_result()
+                devices = ThreadedWaitingDialog(
+                    func=lambda: self.hwi_enumerate(allow_emulators=allow_emulators),
+                    title=self.tr("Unlock USB devices"),
+                    message=self.tr("Please unlock USB devices"),
+                ).get_result()
+            else:
+                devices = HWIQuick(network=self.network).hwi_enumerate()
+
+        except Exception as e:
+            logger.error(str(e))
+        return devices
+
+    def get_device(self, slow_hwi_listing=False) -> Dict[str, Any]:
+        "Returns the found devices WITHOUT unlocking them first.  Misses the fingerprints"
+        devices = self.get_devices(slow_hwi_listing=slow_hwi_listing)
 
         if not devices:
             get_message_box(
