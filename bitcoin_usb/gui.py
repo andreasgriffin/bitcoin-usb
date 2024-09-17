@@ -3,6 +3,7 @@ import platform
 from typing import Any, Dict, List, Optional, Tuple
 
 import bdkpython as bdk
+import hwilib.commands as hwi_commands
 from PyQt6.QtCore import QObject
 from PyQt6.QtWidgets import QMessageBox, QPushButton
 
@@ -46,12 +47,12 @@ class USBGui(QObject):
                     ]
 
                 devices = ThreadedWaitingDialog(
-                    func=lambda: self.hwi_enumerate(allow_emulators=allow_emulators),
+                    func=lambda: hwi_commands.enumerate(allow_emulators=allow_emulators),
                     title=self.tr("Unlock USB devices"),
                     message=self.tr("Please unlock USB devices"),
                 ).get_result()
             else:
-                devices = HWIQuick(network=self.network).hwi_enumerate()
+                devices = HWIQuick(network=self.network).enumerate()
 
         except Exception as e:
             logger.error(str(e))

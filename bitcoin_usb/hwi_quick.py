@@ -12,7 +12,7 @@ logger = logging.getLogger(__name__)
 
 
 class HWIQuick:
-    """The issue with hwilib.hwi_enumerate is that it needs to unlock all connected devices.
+    """The issue with hwilib.commands.enumerate is that it needs to unlock all connected devices.
     However for simply listing the devices (without fingerprint), this isnt necessary.
 
     Even worse, if multiple USB devices are connected and the user is expecting to use
@@ -70,7 +70,7 @@ class HWIQuick:
     @patch("hwilib.devices.ledger.LedgerClient")
     @patch("hwilib.devices.trezor.TrezorClient")
     @patch("hwilib.devices.bitbox02.enumerate")
-    def hwi_enumerate(
+    def enumerate(
         self,
         bitbox02_enumerate,
         mock_trezor_client,
