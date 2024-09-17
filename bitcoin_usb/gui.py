@@ -18,6 +18,10 @@ from .i18n import translate
 logger = logging.getLogger(__name__)
 
 
+class USBMultisigRegisteringNotSupported(Exception):
+    pass
+
+
 class USBGui(QObject):
     def __init__(
         self,
@@ -142,6 +146,29 @@ class USBGui(QObject):
         selected_device = self.get_device()
         if not selected_device:
             return None
+
+        try:
+            with USBDevice(selected_device, self.network) as dev:
+                return dev.display_address(
+                    address_descriptor=address_descriptor,
+                )
+        except Exception as e:
+            if not self.handle_exception_display_address(e):
+                raise
+        return None
+
+    def register_multisig(
+        self,
+        address_descriptor: str,
+    ) -> Optional[str]:
+        selected_device = self.get_device()
+        if not selected_device:
+            return None
+
+        if selected_device["type"] == "coldcard":
+            raise USBMultisigRegisteringNotSupported(
+                f"Registering multisig wallets via USB is not supported by {selected_device['type']}. Please use sd-cards or scan the QR Code."
+            )
 
         try:
             with USBDevice(selected_device, self.network) as dev:
