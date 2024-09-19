@@ -16,10 +16,21 @@ from bitcointx.wallet import CCoinExtPubKey
 
 class PSBTTools:
     @staticmethod
-    def finalize(psbt: bdk.PartiallySignedTransaction) -> Optional[bdk.Transaction]:
-        psbt_tx: TXPartiallySignedTransaction = TXPartiallySignedTransaction.from_base64(psbt.serialize())
-        # this trys to finalize the tx
+    def select_bitcointx_network(network: bdk.Network):
+        network_params = {
+            bdk.Network.BITCOIN: "bitcoin",
+            bdk.Network.TESTNET: "bitcoin/testnet",
+            bdk.Network.REGTEST: "bitcoin/regtest",
+            bdk.Network.SIGNET: "bitcoin/signet",
+        }
+        select_chain_params(network_params.get(network, "bitcoin"))
+
+    @staticmethod
+    def finalize(psbt: bdk.PartiallySignedTransaction, network: bdk.Network) -> Optional[bdk.Transaction]:
+        PSBTTools.select_bitcointx_network(network)
         try:
+            psbt_tx: TXPartiallySignedTransaction = TXPartiallySignedTransaction.from_base64(psbt.serialize())
+            # this trys to finalize the tx
             psbt_tx.extract_transaction()
             if psbt_tx.is_final():
                 return bdk.Transaction(psbt_tx.extract_transaction().serialize())
@@ -31,14 +42,7 @@ class PSBTTools:
     def add_global_xpub_dict_to_psbt(
         psbt: bdk.PartiallySignedTransaction, global_xpub: Dict[str, Tuple[str, str]], network: bdk.Network
     ) -> bdk.PartiallySignedTransaction:
-        # Select network parameters
-        network_params = {
-            bdk.Network.BITCOIN: "bitcoin",
-            bdk.Network.TESTNET: "bitcoin/testnet",
-            bdk.Network.REGTEST: "bitcoin/regtest",
-            bdk.Network.SIGNET: "bitcoin/signet",
-        }
-        select_chain_params(network_params.get(network, "bitcoin"))
+        PSBTTools.select_bitcointx_network(network)
 
         tx_psbt = TXPartiallySignedTransaction.from_base64(psbt.serialize())
 
