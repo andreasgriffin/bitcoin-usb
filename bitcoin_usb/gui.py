@@ -167,7 +167,9 @@ class USBGui(QObject):
 
         if selected_device["type"] == "coldcard":
             raise USBMultisigRegisteringNotSupported(
-                f"Registering multisig wallets via USB is not supported by {selected_device['type']}. Please use sd-cards or scan the QR Code."
+                self.tr(
+                    "Registering multisig wallets via USB is not supported by {device_type}. Please use sd-cards or scan the QR Code."
+                ).format(device_type=selected_device["type"])
             )
 
         try:
