@@ -8,10 +8,11 @@ from hwilib.psbt import PSBT
 
 logger = logging.getLogger(__name__)
 
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
 import bdkpython as bdk
 from hwilib.descriptor import MultisigDescriptor as HWIMultisigDescriptor
+from hwilib.hwwclient import HardwareWalletClient
 
 from .address_types import (
     AddressType,
@@ -65,7 +66,7 @@ class USBDevice(BaseDevice):
         super().__init__(network=network)
         self.selected_device = selected_device
         self.lock = threading.Lock()
-        self.client = None
+        self.client: Optional[HardwareWalletClient] = None
 
     def __enter__(self):
         self.lock.acquire()
