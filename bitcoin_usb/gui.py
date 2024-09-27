@@ -10,7 +10,6 @@ from PyQt6.QtWidgets import QMessageBox, QPushButton
 from bitcoin_usb.address_types import AddressType
 from bitcoin_usb.dialogs import DeviceDialog, ThreadedWaitingDialog, get_message_box
 from bitcoin_usb.hwi_quick import HWIQuick
-from bitcoin_usb.udevwrapper import UDevWrapper
 
 from .device import USBDevice
 from .i18n import translate
@@ -233,12 +232,14 @@ class USBGui(QObject):
         # Add a custom button
         install_button = QPushButton(translate("bitcoin_usb", "Install udev files"))
         msg_box.addButton(install_button, QMessageBox.ButtonRole.ActionRole)
-        install_button.clicked.connect(self.linux_cmd_install_udev_as_sudo)
+        install_button.clicked.connect(lambda: self.linux_cmd_install_udev_as_sudo())
 
         # Show the text box and wait for a response
         msg_box.exec()
 
     def linux_cmd_install_udev_as_sudo(self):
+        from bitcoin_usb.udevwrapper import UDevWrapper
+
         UDevWrapper().linux_cmd_install_udev_as_sudo()
         get_message_box(
             translate("bitcoin_usb", "Please restart your computer for the changes to take effect."),
