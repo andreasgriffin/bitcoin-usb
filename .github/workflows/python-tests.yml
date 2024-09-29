@@ -27,7 +27,7 @@ jobs:
       if: runner.os == 'Linux'
       run: |
         sudo apt-get update
-        sudo apt-get install -y libsecp256k1-dev
+        sudo apt-get install -y libsecp256k1-dev libegl1
 
     - name: Install Python dependencies
       run: |

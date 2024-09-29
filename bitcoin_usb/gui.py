@@ -29,6 +29,7 @@ class USBGui(QObject):
         autoselect_if_1_device=False,
         parent=None,
     ) -> None:
+        super().__init__()
         self.autoselect_if_1_device = autoselect_if_1_device
         self.network = network
         self.parent = parent
@@ -156,6 +157,21 @@ class USBGui(QObject):
                 raise
         return None
 
+    def wipe_device(
+        self,
+    ) -> Optional[bool]:
+        selected_device = self.get_device()
+        if not selected_device:
+            return None
+
+        try:
+            with USBDevice(selected_device, self.network) as dev:
+                return dev.wipe_device()
+        except Exception as e:
+            if not self.handle_exception_wipe(e):
+                raise
+        return None
+
     def register_multisig(
         self,
         address_descriptor: str,
@@ -197,6 +213,10 @@ class USBGui(QObject):
         return True
 
     def handle_exception_sign(self, exception: Exception) -> bool:
+        self.show_error_message(str(exception))
+        return True
+
+    def handle_exception_wipe(self, exception: Exception) -> bool:
         self.show_error_message(str(exception))
         return True
 

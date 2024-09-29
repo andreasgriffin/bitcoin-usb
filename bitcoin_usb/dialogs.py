@@ -53,36 +53,36 @@ class ThreadedWaitingDialog(QDialog):
         self.setWindowTitle(title)
         self.setModal(True)
 
-        layout = QVBoxLayout(self)
+        self._layout = QVBoxLayout(self)
         self.label = QLabel(message)
-        layout.addWidget(self.label)
+        self._layout.addWidget(self.label)
 
         # Setup worker and thread
         self.worker = Worker(func, *args, **kwargs)
-        self.thread = QThread()
-        self.worker.moveToThread(self.thread)
-        self.worker.finished.connect(self.handle_result)
-        self.thread.started.connect(self.worker.run)
+        self._thread = QThread()
+        self.worker.moveToThread(self._thread)
+        self.worker.finished.connect(self.handle_func_result)
+        self._thread.started.connect(self.worker.run)
 
         self.loop = QEventLoop()  # Event loop to block for synchronous execution
 
-    def handle_result(self, result):
+    def handle_func_result(self, result):
         self.result = result
         if self.loop.isRunning():
             self.loop.exit()  # Exit the loop only if it's running
 
     def get_result(self):
         self.show()  # Show the dialog
-        self.thread.start()  # Start the thread
+        self._thread.start()  # Start the thread
         self.loop.exec()  # Block here until the operation finishes
         self.close()  # Close the dialog
         return self.result
 
     def closeEvent(self, event):
-        if self.thread.isRunning():
-            self.thread.quit()
-            self.thread.wait()
-        event.accept()  # Ensure the event is accepted after cleanup
+        if self._thread.isRunning():
+            self._thread.quit()
+            self._thread.wait()
+        super().closeEvent(event)
 
 
 class DeviceDialog(QDialog):

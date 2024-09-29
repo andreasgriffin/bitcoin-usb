@@ -15,9 +15,10 @@ from PyQt6.QtWidgets import (
 from bitcoin_usb.gui import USBGui
 
 
-class MainWindow(QMainWindow):
+class ToolGui(QMainWindow):
     def __init__(self, network: bdk.Network):
         super().__init__()
+        self.setWindowTitle(self.tr("USB Signer Tools"))
         self.usb = USBGui(network=network)
 
         main_widget = QWidget()
@@ -82,11 +83,22 @@ class MainWindow(QMainWindow):
         address_tab.layout().addWidget(self.display_address_button)
         tab_widget.addTab(address_tab, self.tr("Display Address"))
 
+        # Tab 5: Wipe device
+        wipe_tab = QWidget()
+        wipe_tab.setLayout(QVBoxLayout())
+        self.display_address_button = QPushButton(self.tr("Wipe Device"), wipe_tab)
+        self.display_address_button.clicked.connect(self.wipe_device)
+        wipe_tab.layout().addWidget(self.display_address_button)
+        tab_widget.addTab(wipe_tab, self.tr("Wipe Device"))
+
         # Initialize the network selection
 
         self.combo_network.currentIndexChanged.connect(
             lambda idx: self.usb.set_network(bdk.Network[self.combo_network.currentText()])
         )
+
+    def wipe_device(self) -> Optional[bool]:
+        return self.usb.wipe_device()
 
     def display_address(self) -> Optional[str]:
         return self.usb.display_address(address_descriptor=self.descriptor_text_edit.toPlainText())
