@@ -5,8 +5,11 @@ from typing import Callable
 
 import hwilib.commands as hwi_commands
 from hwilib.common import Chain
+from hwilib.descriptor import MultisigDescriptor as HWIMultisigDescriptor
 from hwilib.devices.bitbox02 import Bitbox02Client, CLINoiseConfig
 from hwilib.devices.bitbox02_lib.bitbox02 import BitBox02
+from hwilib.devices.bitbox02_lib.communication import devices as bitbox02devices
+from hwilib.hwwclient import HardwareWalletClient
 from hwilib.psbt import PSBT
 from PyQt6.QtCore import QEventLoop, QObject, Qt, QThread, pyqtSignal
 from PyQt6.QtWidgets import (
@@ -25,9 +28,6 @@ logger = logging.getLogger(__name__)
 from typing import Any, Callable, Dict, Optional
 
 import bdkpython as bdk
-from hwilib.descriptor import MultisigDescriptor as HWIMultisigDescriptor
-from hwilib.devices.bitbox02_lib.communication import devices as bitbox02devices
-from hwilib.hwwclient import HardwareWalletClient
 
 from .address_types import (
     AddressType,

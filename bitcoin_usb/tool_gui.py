@@ -15,9 +15,10 @@ from PyQt6.QtWidgets import (
 from bitcoin_usb.gui import USBGui
 
 
-class MainWindow(QMainWindow):
+class ToolGui(QMainWindow):
     def __init__(self, network: bdk.Network):
         super().__init__()
+        self.setWindowTitle(self.tr("USB Signer Tools"))
         self.usb = USBGui(network=network)
 
         main_widget = QWidget()
