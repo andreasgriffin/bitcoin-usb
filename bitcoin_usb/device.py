@@ -349,8 +349,4 @@ class USBDevice(BaseDevice, QObject):
                 ),
             )
         else:
-            bip32_path = desc_infos.spk_providers[0].derivation_path[1:].split("/")
-            return self.client.display_singlesig_address(
-                f"m{bip32_path}",
-                get_hwi_address_type(desc_infos.address_type),
-            )
+            return hwi_commands.displayaddress(self.client, desc=address_descriptor)["address"]
