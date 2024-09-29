@@ -7,7 +7,7 @@ import hwilib.commands as hwi_commands
 from hwilib.common import Chain
 from hwilib.descriptor import MultisigDescriptor as HWIMultisigDescriptor
 from hwilib.devices.bitbox02 import Bitbox02Client, CLINoiseConfig
-from hwilib.devices.bitbox02_lib.bitbox02 import BitBox02
+from hwilib.devices.bitbox02_lib import bitbox02
 from hwilib.devices.bitbox02_lib.communication import devices as bitbox02devices
 from hwilib.hwwclient import HardwareWalletClient
 from hwilib.psbt import PSBT
@@ -261,7 +261,7 @@ class USBDevice(BaseDevice, QObject):
             if device_info["path"].decode() != client.device_path:
                 continue
 
-            bb02 = BitBox02(
+            bb02 = bitbox02.BitBox02(
                 transport=client.transport,
                 device_info=device_info,
                 noise_config=client.noise_config,
