@@ -1,5 +1,6 @@
 import logging
 import platform
+import re
 from typing import Any, Dict, List, Optional, Tuple
 
 import bdkpython as bdk
@@ -17,6 +18,22 @@ from .i18n import translate
 logger = logging.getLogger(__name__)
 
 
+def clean_string(input_string: str) -> str:
+    """
+    Removes special characters from a string and replaces spaces with underscores.
+
+    Args:
+    input_string (str): The string to be cleaned.
+
+    Returns:
+    str: The cleaned string.
+    """
+    # First, remove any character that is not a letter, number, or space
+    cleaned = re.sub(r"[^\w\s]", "", input_string)
+
+    return cleaned.replace(" ", "_")
+
+
 class USBMultisigRegisteringNotSupported(Exception):
     pass
 
@@ -27,12 +44,14 @@ class USBGui(QObject):
         network: bdk.Network,
         allow_emulators_only_for_testnet_works: bool = True,
         autoselect_if_1_device=False,
+        initalization_label="",
         parent=None,
     ) -> None:
         super().__init__()
         self.autoselect_if_1_device = autoselect_if_1_device
         self.network = network
-        self.parent = parent
+        self._parent = parent
+        self.initalization_label = clean_string(initalization_label)
         self.allow_emulators_only_for_testnet_works = allow_emulators_only_for_testnet_works
 
     def get_devices(self, slow_hwi_listing=False) -> List[Dict[str, Any]]:
@@ -75,7 +94,7 @@ class USBGui(QObject):
         if len(devices) == 1 and self.autoselect_if_1_device:
             return devices[0]
         else:
-            dialog = DeviceDialog(self.parent, devices, self.network)
+            dialog = DeviceDialog(self._parent, devices, self.network)
             if dialog.exec():
                 return dialog.get_selected_device()
             else:
@@ -92,7 +111,11 @@ class USBGui(QObject):
 
         try:
 
-            with USBDevice(selected_device, self.network) as dev:
+            with USBDevice(
+                selected_device=selected_device,
+                network=self.network,
+                initalization_label=self.initalization_label,
+            ) as dev:
                 return dev.sign_psbt(psbt)
         except Exception as e:
             if not self.handle_exception_sign(e):
@@ -106,7 +129,11 @@ class USBGui(QObject):
             return None
 
         try:
-            with USBDevice(selected_device, self.network) as dev:
+            with USBDevice(
+                selected_device=selected_device,
+                network=self.network,
+                initalization_label=self.initalization_label,
+            ) as dev:
                 return selected_device, dev.get_fingerprint(), dev.get_xpubs()
         except Exception as e:
             if not self.handle_exception_get_fingerprint_and_xpubs(e):
@@ -119,7 +146,11 @@ class USBGui(QObject):
             return None
 
         try:
-            with USBDevice(selected_device, self.network) as dev:
+            with USBDevice(
+                selected_device=selected_device,
+                network=self.network,
+                initalization_label=self.initalization_label,
+            ) as dev:
                 return selected_device, dev.get_fingerprint(), dev.get_xpub(key_origin)
         except Exception as e:
             if not self.handle_exception_get_fingerprint_and_xpubs(e):
@@ -132,7 +163,11 @@ class USBGui(QObject):
             return None
 
         try:
-            with USBDevice(selected_device, self.network) as dev:
+            with USBDevice(
+                selected_device=selected_device,
+                network=self.network,
+                initalization_label=self.initalization_label,
+            ) as dev:
                 return dev.sign_message(message, bip32_path)
         except Exception as e:
             if not self.handle_exception_sign_message(e):
@@ -148,7 +183,11 @@ class USBGui(QObject):
             return None
 
         try:
-            with USBDevice(selected_device, self.network) as dev:
+            with USBDevice(
+                selected_device=selected_device,
+                network=self.network,
+                initalization_label=self.initalization_label,
+            ) as dev:
                 return dev.display_address(
                     address_descriptor=address_descriptor,
                 )
@@ -165,7 +204,11 @@ class USBGui(QObject):
             return None
 
         try:
-            with USBDevice(selected_device, self.network) as dev:
+            with USBDevice(
+                selected_device=selected_device,
+                network=self.network,
+                initalization_label=self.initalization_label,
+            ) as dev:
                 return dev.wipe_device()
         except Exception as e:
             if not self.handle_exception_wipe(e):
@@ -188,7 +231,11 @@ class USBGui(QObject):
             )
 
         try:
-            with USBDevice(selected_device, self.network) as dev:
+            with USBDevice(
+                selected_device=selected_device,
+                network=self.network,
+                initalization_label=self.initalization_label,
+            ) as dev:
                 return dev.display_address(
                     address_descriptor=address_descriptor,
                 )

@@ -11,7 +11,7 @@ disable_error_code = "assignment"
 
 [tool.poetry]
 name = "bitcoin-usb"
-version = "0.5.1"
+version = "0.5.3"
 authors = ["andreasgriffin <andreasgriffin@proton.me>"]
 license = "GPL-3.0"
 readme = "README.md"
@@ -25,6 +25,7 @@ python-bitcointx = "1.1.4"
 hwi = "^3.0.0"
 pyqt6 = "^6.6.1"
 mnemonic = "^0.21"
+requests = "^2.32.3" # essential for Jade to work
 
 
 
