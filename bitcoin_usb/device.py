@@ -246,9 +246,10 @@ class DialogNoiseConfig(CLINoiseConfig):
 
 
 class USBDevice(BaseDevice, QObject):
-    def __init__(self, selected_device: Dict[str, Any], network: bdk.Network):
+    def __init__(self, selected_device: Dict[str, Any], network: bdk.Network, initalization_label: str = ""):
         QObject.__init__(self)
         BaseDevice.__init__(self, network=network)
+        self.initalization_label = initalization_label
         self.selected_device = selected_device
         self.lock = threading.Lock()
         self.client: Optional[HardwareWalletClient] = None
@@ -284,7 +285,7 @@ class USBDevice(BaseDevice, QObject):
             self.noise_config = DialogNoiseConfig()
             self.client.noise_config = self.noise_config
             if not self.is_bitbox02_initialized(self.client):
-                self.client.setup_device()
+                self.client.setup_device(label=self.initalization_label)
 
         return self
 
