@@ -5,6 +5,7 @@ from typing import Any, Dict, List, Optional, Tuple
 
 import bdkpython as bdk
 import hwilib.commands as hwi_commands
+from hwilib.devices.bitbox02 import Bitbox02Client
 from PyQt6.QtCore import QObject
 from PyQt6.QtWidgets import QMessageBox, QPushButton
 
@@ -215,6 +216,30 @@ class USBGui(QObject):
                 raise
         return None
 
+    def write_down_seed(
+        self,
+    ) -> Optional[bool]:
+        selected_device = self.get_device()
+        if not selected_device:
+            return None
+
+        try:
+            with USBDevice(
+                selected_device=selected_device,
+                network=self.network,
+                initalization_label=self.initalization_label,
+            ) as dev:
+                if isinstance(dev.client, Bitbox02Client):
+                    return dev.write_down_seed(dev.client)
+                else:
+                    QMessageBox.information(
+                        None, "Not supported", "This is currently only supported for Bitbox02"
+                    )
+        except Exception as e:
+            if not self.handle_exception_write_down_seed(e):
+                raise
+        return None
+
     def register_multisig(
         self,
         address_descriptor: str,
@@ -264,6 +289,10 @@ class USBGui(QObject):
         return True
 
     def handle_exception_wipe(self, exception: Exception) -> bool:
+        self.show_error_message(str(exception))
+        return True
+
+    def handle_exception_write_down_seed(self, exception: Exception) -> bool:
         self.show_error_message(str(exception))
         return True
 

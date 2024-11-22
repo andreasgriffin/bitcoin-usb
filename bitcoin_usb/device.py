@@ -269,6 +269,29 @@ class USBDevice(BaseDevice, QObject):
             )
             return bb02.device_info()["initialized"]
 
+    @classmethod
+    def write_down_seed(cls, client: Bitbox02Client) -> Optional[bool]:
+        if not isinstance(client, Bitbox02Client):
+            return None
+
+        try:
+            return client.backup_device()
+        except:
+            # the user canceled the backing up, so ask again
+            return False
+
+    @classmethod
+    def write_down_seed_ask_until_success(cls, client: Bitbox02Client) -> Optional[bool]:
+        if not isinstance(client, Bitbox02Client):
+            return None
+        while question_dialog(
+            "Do you want to show the mnemonic seed to back it up on paper?", title="Show Seed?"
+        ):
+            success = cls.write_down_seed(client)
+            if success:
+                return success
+        return False
+
     def __enter__(self):
         self.lock.acquire()
         self.client = hwi_commands.get_client(
@@ -286,7 +309,7 @@ class USBDevice(BaseDevice, QObject):
             self.client.noise_config = self.noise_config
             if not self.is_bitbox02_initialized(self.client):
                 self.client.setup_device(label=self.initalization_label)
-
+                self.write_down_seed_ask_until_success(self.client)
         return self
 
     def __exit__(self, exc_type, exc_value, traceback):
