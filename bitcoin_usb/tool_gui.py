@@ -86,10 +86,18 @@ class ToolGui(QMainWindow):
         # Tab 5: Wipe device
         wipe_tab = QWidget()
         wipe_tab.setLayout(QVBoxLayout())
-        self.display_address_button = QPushButton(self.tr("Wipe Device"), wipe_tab)
-        self.display_address_button.clicked.connect(self.wipe_device)
-        wipe_tab.layout().addWidget(self.display_address_button)
+        self.wipe_button = QPushButton(self.tr("Wipe Device"), wipe_tab)
+        self.wipe_button.clicked.connect(self.wipe_device)
+        wipe_tab.layout().addWidget(self.wipe_button)
         tab_widget.addTab(wipe_tab, self.tr("Wipe Device"))
+
+        # Tab 6: Show seed
+        show_seed_tab = QWidget()
+        show_seed_tab.setLayout(QVBoxLayout())
+        self.show_seed_button = QPushButton(self.tr("Show Seed"), show_seed_tab)
+        self.show_seed_button.clicked.connect(self.write_down_seed)
+        show_seed_tab.layout().addWidget(self.show_seed_button)
+        tab_widget.addTab(show_seed_tab, self.tr("Show Seed"))
 
         # Initialize the network selection
 
@@ -99,6 +107,9 @@ class ToolGui(QMainWindow):
 
     def wipe_device(self) -> Optional[bool]:
         return self.usb.wipe_device()
+
+    def write_down_seed(self) -> Optional[bool]:
+        return self.usb.write_down_seed()
 
     def display_address(self) -> Optional[str]:
         return self.usb.display_address(address_descriptor=self.descriptor_text_edit.toPlainText())

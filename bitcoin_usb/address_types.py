@@ -34,19 +34,23 @@ class ConstDerivationPaths:
 class AddressType:
     def __init__(
         self,
+        short_name: str,
         name: str,
         is_multisig: bool,
         hwi_descriptor_classes: Sequence[Descriptor],
-        key_origin: Callable[[bdk.Network], str] = None,
+        key_origin: Callable[[bdk.Network], str],
         bdk_descriptor_secret: Callable[
             [bdk.DescriptorSecretKey, bdk.KeychainKind, bdk.Network], bdk.Descriptor
-        ] = None,
-        info_url: str = None,
-        description: str = None,
+        ]
+        | None = None,
+        info_url: str | None = None,
+        description: str | None = None,
         bdk_descriptor: Callable[
             [bdk.DescriptorPublicKey, str, bdk.KeychainKind, bdk.Network], bdk.Descriptor
-        ] = None,
+        ]
+        | None = None,
     ) -> None:
+        self.short_name = short_name
         self.name = name
         self.is_multisig = is_multisig
         self.key_origin: Callable[[bdk.Network], str] = key_origin
@@ -58,6 +62,7 @@ class AddressType:
 
     def clone(self):
         return AddressType(
+            short_name=self.short_name,
             name=self.name,
             is_multisig=self.is_multisig,
             key_origin=self.key_origin,
@@ -80,8 +85,9 @@ class AddressType:
 
 class AddressTypes:
     p2pkh = AddressType(
+        "p2pkh",
         "Single Sig (Legacy/p2pkh)",
-        False,
+        is_multisig=False,
         key_origin=lambda network: f"m/44h/{0 if network==bdk.Network.BITCOIN else 1}h/0h",
         bdk_descriptor=bdk.Descriptor.new_bip44_public,
         bdk_descriptor_secret=bdk.Descriptor.new_bip44,
@@ -90,8 +96,9 @@ class AddressTypes:
         hwi_descriptor_classes=(PKHDescriptor,),
     )
     p2sh_p2wpkh = AddressType(
+        "p2sh-p2wpkh",
         "Single Sig (Nested/p2sh-p2wpkh)",
-        False,
+        is_multisig=False,
         key_origin=lambda network: f"m/49h/{0 if network==bdk.Network.BITCOIN else 1}h/0h",
         bdk_descriptor=bdk.Descriptor.new_bip49_public,
         bdk_descriptor_secret=bdk.Descriptor.new_bip49,
@@ -100,8 +107,9 @@ class AddressTypes:
         hwi_descriptor_classes=(SHDescriptor, WPKHDescriptor),
     )
     p2wpkh = AddressType(
+        "p2wpkh",
         "Single Sig (SegWit/p2wpkh)",
-        False,
+        is_multisig=False,
         key_origin=lambda network: f"m/84h/{0 if network==bdk.Network.BITCOIN else 1}h/0h",
         bdk_descriptor=bdk.Descriptor.new_bip84_public,
         bdk_descriptor_secret=bdk.Descriptor.new_bip84,
@@ -110,8 +118,9 @@ class AddressTypes:
         hwi_descriptor_classes=(WPKHDescriptor,),
     )
     p2tr = AddressType(
+        "p2tr",
         "Single Sig (Taproot/p2tr)",
-        False,
+        is_multisig=False,
         key_origin=lambda network: f"m/86h/{0 if network==bdk.Network.BITCOIN else 1}h/0h",
         bdk_descriptor=bdk.Descriptor.new_bip86_public,
         bdk_descriptor_secret=bdk.Descriptor.new_bip86,
@@ -120,8 +129,9 @@ class AddressTypes:
         hwi_descriptor_classes=(TRDescriptor,),
     )
     p2sh_p2wsh = AddressType(
+        "p2sh-p2wsh",
         "Multi Sig (Nested/p2sh-p2wsh)",
-        True,
+        is_multisig=True,
         key_origin=lambda network: f"m/48h/{0 if network==bdk.Network.BITCOIN else 1}h/0h/1h",
         bdk_descriptor_secret=None,
         info_url="https://github.com/bitcoin/bips/blob/master/bip-0048.mediawiki",
@@ -129,8 +139,9 @@ class AddressTypes:
         hwi_descriptor_classes=(SHDescriptor, WSHDescriptor, MultisigDescriptor),
     )
     p2wsh = AddressType(
+        "p2wsh",
         "Multi Sig (SegWit/p2wsh)",
-        True,
+        is_multisig=True,
         key_origin=lambda network: f"m/48h/{0 if network==bdk.Network.BITCOIN else 1}h/0h/2h",
         bdk_descriptor_secret=None,
         info_url="https://github.com/bitcoin/bips/blob/master/bip-0048.mediawiki",
