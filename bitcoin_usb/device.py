@@ -1,6 +1,7 @@
 import logging
 import threading
 from abc import abstractmethod
+from pathlib import Path
 from typing import Callable
 
 import hwilib.commands as hwi_commands
@@ -9,6 +10,7 @@ from hwilib.descriptor import MultisigDescriptor as HWIMultisigDescriptor
 from hwilib.devices.bitbox02 import Bitbox02Client, CLINoiseConfig
 from hwilib.devices.bitbox02_lib import bitbox02
 from hwilib.devices.bitbox02_lib.communication import devices as bitbox02devices
+from hwilib.devices.trezor import TrezorClient
 from hwilib.hwwclient import HardwareWalletClient
 from hwilib.psbt import PSBT
 from PyQt6.QtCore import QEventLoop, QObject, Qt, QThread, pyqtSignal
@@ -23,6 +25,7 @@ from PyQt6.QtWidgets import (
 
 from bitcoin_usb.dialogs import Worker
 from bitcoin_usb.i18n import translate
+from bitcoin_usb.util import run_script
 
 logger = logging.getLogger(__name__)
 from typing import Any, Callable, Dict, Optional
@@ -299,6 +302,22 @@ class USBDevice(BaseDevice, QObject):
             device_path=self.selected_device["path"],
             chain=bdknetwork_to_chain(self.network),
         )
+
+        if isinstance(self.client, TrezorClient):
+            self.client.client.refresh_features()
+            if self.client.client.features.bootloader_mode:
+                filepath = Path(__file__).parent / "device_scripts" / "trezor_firmware.py"
+                output, error = run_script(filepath, args=["--path", self.selected_device["path"]])
+                logger.debug(f"{filepath} returned {output=}")
+                # the error appears even if the firmware was instralled successfully.
+                # So do not raise an exception
+                logger.error(f"{filepath} returned {error=}")
+
+            if not self.client.client.features.initialized:
+                if question_dialog(text=self.tr("Do you want to restore an existing seed onto the device?")):
+                    self.client.restore_device()
+                else:
+                    self.client.setup_device()
 
         # the bitbox02 initialization works only
         # if i access the bitbox02 class directly and
