@@ -5,6 +5,7 @@
   - Coldcard
   - Bitbox02
   - Jade
+  - Trezor Safe 5
 
 
 * It also provides 
