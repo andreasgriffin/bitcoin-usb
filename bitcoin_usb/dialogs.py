@@ -89,23 +89,23 @@ class DeviceDialog(QDialog):
     def __init__(self, parent, devices: List[Dict[str, Any]], network: bdk.Network):
         super().__init__(parent)
         self.setWindowTitle(self.tr("Select the detected device"))
-        self.layout = QVBoxLayout(self)
+        self._layout = QVBoxLayout(self)
         self.setModal(True)
 
         # Creating a button for each device
         for device in devices:
             button = QPushButton(f"{device.get('type', '')} - {device.get('model', '')}", self)
             button.clicked.connect(lambda *args, d=device: self.select_device(d))
-            self.layout.addWidget(button)
+            self._layout.addWidget(button)
 
-        self.selected_device = None
+        self.selected_device: Dict[str, Any] | None = None
         self.network = network
 
-    def select_device(self, device):
+    def select_device(self, device: Dict[str, Any]):
         self.selected_device = device
         self.accept()
 
-    def get_selected_device(self):
+    def get_selected_device(self) -> Dict[str, Any] | None:
         return self.selected_device
 
 

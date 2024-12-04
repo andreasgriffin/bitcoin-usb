@@ -6,7 +6,7 @@ from typing import Any, Dict, List, Optional, Tuple
 import bdkpython as bdk
 import hwilib.commands as hwi_commands
 from hwilib.devices.bitbox02 import Bitbox02Client
-from PyQt6.QtCore import QObject
+from PyQt6.QtCore import QObject, pyqtSignal
 from PyQt6.QtWidgets import QMessageBox, QPushButton
 
 from bitcoin_usb.address_types import AddressType
@@ -40,6 +40,8 @@ class USBMultisigRegisteringNotSupported(Exception):
 
 
 class USBGui(QObject):
+    signal_end_hwi_blocker = pyqtSignal()
+
     def __init__(
         self,
         network: bdk.Network,
@@ -54,6 +56,9 @@ class USBGui(QObject):
         self._parent = parent
         self.initalization_label = clean_string(initalization_label)
         self.allow_emulators_only_for_testnet_works = allow_emulators_only_for_testnet_works
+
+    def set_initalization_label(self, value: str):
+        self.initalization_label = clean_string(value)
 
     def get_devices(self, slow_hwi_listing=False) -> List[Dict[str, Any]]:
         "Returns the found devices WITHOUT unlocking them first.  Misses the fingerprints"
@@ -82,7 +87,7 @@ class USBGui(QObject):
             logger.error(str(e))
         return devices
 
-    def get_device(self, slow_hwi_listing=False) -> Dict[str, Any]:
+    def get_device(self, slow_hwi_listing=False) -> Dict[str, Any] | None:
         "Returns the found devices WITHOUT unlocking them first.  Misses the fingerprints"
         devices = self.get_devices(slow_hwi_listing=slow_hwi_listing)
 
@@ -91,7 +96,8 @@ class USBGui(QObject):
                 translate("bitcoin_usb", "No USB devices found"),
                 title=translate("bitcoin_usb", "USB Devices"),
             ).exec()
-            return {}
+            self.signal_end_hwi_blocker.emit()
+            return None
         if len(devices) == 1 and self.autoselect_if_1_device:
             return devices[0]
         else:
@@ -103,7 +109,8 @@ class USBGui(QObject):
                     translate("bitcoin_usb", "No device selected"),
                     title=translate("bitcoin_usb", "USB Devices"),
                 ).exec()
-        return {}
+                self.signal_end_hwi_blocker.emit()
+        return None
 
     def sign(self, psbt: bdk.PartiallySignedTransaction) -> Optional[bdk.PartiallySignedTransaction]:
         selected_device = self.get_device()
@@ -121,6 +128,8 @@ class USBGui(QObject):
         except Exception as e:
             if not self.handle_exception_sign(e):
                 raise
+        finally:
+            self.signal_end_hwi_blocker.emit()
 
         return None
 
@@ -139,6 +148,8 @@ class USBGui(QObject):
         except Exception as e:
             if not self.handle_exception_get_fingerprint_and_xpubs(e):
                 raise
+        finally:
+            self.signal_end_hwi_blocker.emit()
         return None
 
     def get_fingerprint_and_xpub(self, key_origin: str) -> Optional[Tuple[Dict[str, Any], str, str]]:
@@ -156,6 +167,8 @@ class USBGui(QObject):
         except Exception as e:
             if not self.handle_exception_get_fingerprint_and_xpubs(e):
                 raise
+        finally:
+            self.signal_end_hwi_blocker.emit()
         return None
 
     def sign_message(self, message: str, bip32_path: str) -> Optional[str]:
@@ -173,6 +186,8 @@ class USBGui(QObject):
         except Exception as e:
             if not self.handle_exception_sign_message(e):
                 raise
+        finally:
+            self.signal_end_hwi_blocker.emit()
         return None
 
     def display_address(
@@ -195,6 +210,8 @@ class USBGui(QObject):
         except Exception as e:
             if not self.handle_exception_display_address(e):
                 raise
+        finally:
+            self.signal_end_hwi_blocker.emit()
         return None
 
     def wipe_device(
@@ -214,6 +231,8 @@ class USBGui(QObject):
         except Exception as e:
             if not self.handle_exception_wipe(e):
                 raise
+        finally:
+            self.signal_end_hwi_blocker.emit()
         return None
 
     def write_down_seed(
@@ -238,6 +257,8 @@ class USBGui(QObject):
         except Exception as e:
             if not self.handle_exception_write_down_seed(e):
                 raise
+        finally:
+            self.signal_end_hwi_blocker.emit()
         return None
 
     def register_multisig(
@@ -267,6 +288,8 @@ class USBGui(QObject):
         except Exception as e:
             if not self.handle_exception_display_address(e):
                 raise
+        finally:
+            self.signal_end_hwi_blocker.emit()
         return None
 
     def set_network(self, network: bdk.Network):
@@ -296,7 +319,7 @@ class USBGui(QObject):
         self.show_error_message(str(exception))
         return True
 
-    def show_error_message(self, text: str):
+    def show_error_message(self, text: str) -> None:
 
         os_name = platform.system()
 
@@ -305,7 +328,7 @@ class USBGui(QObject):
         else:
             self.show_error_message(text)
 
-    def show_error_message_linux(self, text: str):
+    def show_error_message_linux(self, text: str) -> None:
         # Create the text box
         msg_box = QMessageBox()
         msg_box.setIcon(QMessageBox.Icon.Critical)
@@ -315,25 +338,31 @@ class USBGui(QObject):
         # Add standard buttons
         msg_box.setStandardButtons(QMessageBox.StandardButton.Ok)
 
-        msg_box.setInformativeText(
-            translate(
-                "bitcoin_usb",
-                "USB errors can appear due to missing udev files. Do you want to install udev files now?",
+        show_udev = True
+        if "cancel" in text.lower():
+            show_udev = False
+        if "aborted" in text.lower():
+            show_udev = False
+        if show_udev:
+            msg_box.setInformativeText(
+                translate(
+                    "bitcoin_usb",
+                    "USB errors can appear due to missing udev files. Do you want to install udev files now?",
+                )
             )
-        )
 
-        # Add standard buttons
-        msg_box.setStandardButtons(QMessageBox.StandardButton.Cancel)
+            # Add standard buttons
+            msg_box.setStandardButtons(QMessageBox.StandardButton.Cancel)
 
-        # Add a custom button
-        install_button = QPushButton(translate("bitcoin_usb", "Install udev files"))
-        msg_box.addButton(install_button, QMessageBox.ButtonRole.ActionRole)
-        install_button.clicked.connect(lambda: self.linux_cmd_install_udev_as_sudo())
+            # Add a custom button
+            install_button = QPushButton(translate("bitcoin_usb", "Install udev files"))
+            msg_box.addButton(install_button, QMessageBox.ButtonRole.ActionRole)
+            install_button.clicked.connect(lambda: self.linux_cmd_install_udev_as_sudo())
 
         # Show the text box and wait for a response
         msg_box.exec()
 
-    def linux_cmd_install_udev_as_sudo(self):
+    def linux_cmd_install_udev_as_sudo(self) -> None:
         from bitcoin_usb.udevwrapper import UDevWrapper
 
         UDevWrapper().linux_cmd_install_udev_as_sudo()

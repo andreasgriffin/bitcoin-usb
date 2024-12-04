@@ -24,7 +24,7 @@ repos:
     rev: v1.11.2   # Use the latest MyPy version
     hooks:
       - id: mypy
-        files: ^bitcoin_usb/ 
+        # exclude: '^(tests/|build/.+)'      
         args: 
           - --check-untyped-defs
           # - --disallow-untyped-defs
@@ -35,13 +35,13 @@ repos:
           # - --warn-return-any
           - --warn-redundant-casts
           - --warn-unreachable
-          # - --disallow-any-generics           
+          - --disallow-any-generics           
           # - --strict        
           - --install-types
           - --non-interactive   
-          - --ignore-missing-imports
+          # - --ignore-missing-imports
           - --show-error-codes 
         additional_dependencies: 
           - types-requests
-          # - pyqt6 
+          - pyqt6 
           - bdkpython

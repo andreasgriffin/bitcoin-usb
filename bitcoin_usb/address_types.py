@@ -4,7 +4,7 @@ from bitcoin_usb.i18n import translate
 
 logger = logging.getLogger(__name__)
 
-from typing import Callable, Dict, List, Optional, Sequence
+from typing import Callable, Dict, List, Optional, Sequence, Type
 
 import bdkpython as bdk
 from hwilib.common import AddressType as HWIAddressType
@@ -37,7 +37,7 @@ class AddressType:
         short_name: str,
         name: str,
         is_multisig: bool,
-        hwi_descriptor_classes: Sequence[Descriptor],
+        hwi_descriptor_classes: Sequence[Type[Descriptor]],
         key_origin: Callable[[bdk.Network], str],
         bdk_descriptor_secret: Callable[
             [bdk.DescriptorSecretKey, bdk.KeychainKind, bdk.Network], bdk.Descriptor

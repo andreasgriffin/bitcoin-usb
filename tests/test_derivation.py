@@ -28,10 +28,11 @@ def test_compare_single_sig_key_derivation_with_bdk_templates():
                 # no gtest possible yet here, because no bdk_template exists
                 continue
 
+            assert address_type.bdk_descriptor_secret
             descriptor = address_type.bdk_descriptor_secret(
-                secret_key=bdk.DescriptorSecretKey(network, bdk.Mnemonic.from_string(test_seed), ""),
-                keychain=bdk.KeychainKind.EXTERNAL,
-                network=network,
+                bdk.DescriptorSecretKey(network, bdk.Mnemonic.from_string(test_seed), ""),
+                bdk.KeychainKind.EXTERNAL,
+                network,
             )
 
             spk_provider = derive_spk_provider(test_seed, address_type.key_origin(network), network)
