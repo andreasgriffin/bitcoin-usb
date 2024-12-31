@@ -11,7 +11,7 @@ disable_error_code = "assignment"
 
 [tool.poetry]
 name = "bitcoin-usb"
-version = "0.7.0"
+version = "0.7.1"
 authors = ["andreasgriffin <andreasgriffin@proton.me>"]
 license = "GPL-3.0"
 readme = "README.md"
@@ -20,7 +20,7 @@ homepage = "https://github.com/andreasgriffin/bitcoin-usb"
 
 [tool.poetry.dependencies]
 python = ">=3.8.1,<3.13"
-bdkpython ="^0.31.0"
+bdkpython ="^0.32.0"
 python-bitcointx = "1.1.4"
 hwi = "^3.0.0"
 pyqt6 = "^6.6.1"
