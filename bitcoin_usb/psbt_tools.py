@@ -33,7 +33,7 @@ class PSBTTools:
             # this trys to finalize the tx
             psbt_tx.extract_transaction()
             if psbt_tx.is_final():
-                return bdk.Transaction(psbt_tx.extract_transaction().serialize())
+                return bdk.Transaction(list(psbt_tx.extract_transaction().serialize()))
             return None
         except:
             return None
