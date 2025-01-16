@@ -376,7 +376,10 @@ class DescriptorInfo:
             _get_descriptor_instances(hwi_descriptor), get_all_address_types()
         )
         if not address_type:
-            raise ValueError(f"descriptor {descriptor_str} cannot be matched to known template")
+            supported_types = [address_type.short_name for address_type in get_all_address_types()]
+            raise ValueError(
+                f"descriptor {descriptor_str} cannot be matched to a supported template. Supported templates are {supported_types}"
+            )
 
         # get the     pubkey_providers, by "walking to the end of desciptors"
         threshold = 1
