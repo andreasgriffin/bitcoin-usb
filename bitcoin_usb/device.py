@@ -305,8 +305,16 @@ class USBDevice(BaseDevice, QObject):
 
         if isinstance(self.client, TrezorClient):
             self.client.client.refresh_features()
+            filepath = Path(__file__).parent / "device_scripts" / "trezor_firmware.py"
+            if not filepath.exists():
+                logger.error(
+                    f"{filepath} could not be found. This file is necessary for initialization of trezor without prior firmware."
+                )
             if self.client.client.features.bootloader_mode:
-                filepath = Path(__file__).parent / "device_scripts" / "trezor_firmware.py"
+                if not filepath.exists():
+                    raise Exception(
+                        f"{filepath} could not be found. This file is necessary for initialization of trezor without prior firmware."
+                    )
                 output, error = run_script(filepath, args=["--path", self.selected_device["path"]])
                 logger.debug(f"{filepath} returned {output=}")
                 # the error appears even if the firmware was instralled successfully.
