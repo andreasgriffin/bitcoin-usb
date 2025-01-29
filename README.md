@@ -2,10 +2,10 @@
 
 * This provides an abstraction layer ontop of hwi, such that only bdk is needed from the outside
 * Currently supported are
-  - Coldcard
+  - Coldcard, Q
   - Bitbox02
-  - Jade
-  - Trezor Safe 5
+  - Blockstream Jade
+  - Trezor Safe 
 
 
 * It also provides 
