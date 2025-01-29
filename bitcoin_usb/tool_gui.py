@@ -1,6 +1,7 @@
 from typing import Optional
 
 import bdkpython as bdk
+from PyQt6.QtGui import QKeySequence, QShortcut
 from PyQt6.QtWidgets import (
     QComboBox,
     QLineEdit,
@@ -116,6 +117,11 @@ class ToolGui(QMainWindow):
         self.combo_network.currentIndexChanged.connect(
             lambda idx: self.usb.set_network(bdk.Network[self.combo_network.currentText()])  # type: ignore
         )
+
+        self.shortcut_close = QShortcut(QKeySequence("Ctrl+W"), self)
+        self.shortcut_close.activated.connect(self.close)
+        self.shortcut_close2 = QShortcut(QKeySequence("ESC"), self)
+        self.shortcut_close2.activated.connect(self.close)
 
     def wipe_device(self) -> Optional[bool]:
         return self.usb.wipe_device()
