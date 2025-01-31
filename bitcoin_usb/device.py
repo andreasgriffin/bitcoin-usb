@@ -322,7 +322,10 @@ class USBDevice(BaseDevice, QObject):
                 logger.error(f"{filepath} returned {error=}")
 
             if not self.client.client.features.initialized:
-                if question_dialog(text=self.tr("Do you want to restore an existing seed onto the device?")):
+                if question_dialog(
+                    text=self.tr("Do you want to restore an existing seed onto the device?"),
+                    buttons=QMessageBox.StandardButton.No | QMessageBox.StandardButton.Yes,
+                ):
                     self.client.restore_device(label=self.initalization_label)
                 else:
                     self.client.setup_device(label=self.initalization_label)
@@ -335,7 +338,10 @@ class USBDevice(BaseDevice, QObject):
             self.noise_config = DialogNoiseConfig()
             self.client.noise_config = self.noise_config
             if not self.is_bitbox02_initialized(self.client):
-                if question_dialog(text=self.tr("Do you want to restore an existing seed onto the device?")):
+                if question_dialog(
+                    text=self.tr("Do you want to restore an existing seed onto the device?"),
+                    buttons=QMessageBox.StandardButton.No | QMessageBox.StandardButton.Yes,
+                ):
                     self.client.restore_device(label=self.initalization_label)
                 else:
                     self.client.setup_device(label=self.initalization_label)
