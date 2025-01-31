@@ -323,9 +323,9 @@ class USBDevice(BaseDevice, QObject):
 
             if not self.client.client.features.initialized:
                 if question_dialog(text=self.tr("Do you want to restore an existing seed onto the device?")):
-                    self.client.restore_device()
+                    self.client.restore_device(label=self.initalization_label)
                 else:
-                    self.client.setup_device()
+                    self.client.setup_device(label=self.initalization_label)
 
         # the bitbox02 initialization works only
         # if i access the bitbox02 class directly and
@@ -335,8 +335,11 @@ class USBDevice(BaseDevice, QObject):
             self.noise_config = DialogNoiseConfig()
             self.client.noise_config = self.noise_config
             if not self.is_bitbox02_initialized(self.client):
-                self.client.setup_device(label=self.initalization_label)
-                self.write_down_seed_ask_until_success(self.client)
+                if question_dialog(text=self.tr("Do you want to restore an existing seed onto the device?")):
+                    self.client.restore_device(label=self.initalization_label)
+                else:
+                    self.client.setup_device(label=self.initalization_label)
+                    self.write_down_seed_ask_until_success(self.client)
         return self
 
     def __exit__(self, exc_type, exc_value, traceback):
