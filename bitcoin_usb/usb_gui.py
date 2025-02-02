@@ -133,8 +133,10 @@ class USBGui(QObject):
 
         return None
 
-    def get_fingerprint_and_xpubs(self) -> Optional[Tuple[Dict[str, Any], str, Dict[AddressType, str]]]:
-        selected_device = self.get_device()
+    def get_fingerprint_and_xpubs(
+        self, slow_hwi_listing=False
+    ) -> Optional[Tuple[Dict[str, Any], str, Dict[AddressType, str]]]:
+        selected_device = self.get_device(slow_hwi_listing=slow_hwi_listing)
         if not selected_device:
             return None
 
@@ -152,8 +154,10 @@ class USBGui(QObject):
             self.signal_end_hwi_blocker.emit()
         return None
 
-    def get_fingerprint_and_xpub(self, key_origin: str) -> Optional[Tuple[Dict[str, Any], str, str]]:
-        selected_device = self.get_device()
+    def get_fingerprint_and_xpub(
+        self, key_origin: str, slow_hwi_listing=False
+    ) -> Optional[Tuple[Dict[str, Any], str, str]]:
+        selected_device = self.get_device(slow_hwi_listing=slow_hwi_listing)
         if not selected_device:
             return None
 
@@ -171,8 +175,8 @@ class USBGui(QObject):
             self.signal_end_hwi_blocker.emit()
         return None
 
-    def sign_message(self, message: str, bip32_path: str) -> Optional[str]:
-        selected_device = self.get_device()
+    def sign_message(self, message: str, bip32_path: str, slow_hwi_listing=False) -> Optional[str]:
+        selected_device = self.get_device(slow_hwi_listing=slow_hwi_listing)
         if not selected_device:
             return None
 
@@ -190,11 +194,8 @@ class USBGui(QObject):
             self.signal_end_hwi_blocker.emit()
         return None
 
-    def display_address(
-        self,
-        address_descriptor: str,
-    ) -> Optional[str]:
-        selected_device = self.get_device()
+    def display_address(self, address_descriptor: str, slow_hwi_listing=False) -> Optional[str]:
+        selected_device = self.get_device(slow_hwi_listing=slow_hwi_listing)
         if not selected_device:
             return None
 
@@ -214,10 +215,8 @@ class USBGui(QObject):
             self.signal_end_hwi_blocker.emit()
         return None
 
-    def wipe_device(
-        self,
-    ) -> Optional[bool]:
-        selected_device = self.get_device()
+    def wipe_device(self, slow_hwi_listing=False) -> Optional[bool]:
+        selected_device = self.get_device(slow_hwi_listing=slow_hwi_listing)
         if not selected_device:
             return None
 
@@ -235,10 +234,8 @@ class USBGui(QObject):
             self.signal_end_hwi_blocker.emit()
         return None
 
-    def write_down_seed(
-        self,
-    ) -> Optional[bool]:
-        selected_device = self.get_device()
+    def write_down_seed(self, slow_hwi_listing=False) -> Optional[bool]:
+        selected_device = self.get_device(slow_hwi_listing=slow_hwi_listing)
         if not selected_device:
             return None
 
@@ -261,11 +258,8 @@ class USBGui(QObject):
             self.signal_end_hwi_blocker.emit()
         return None
 
-    def register_multisig(
-        self,
-        address_descriptor: str,
-    ) -> Optional[str]:
-        selected_device = self.get_device()
+    def register_multisig(self, address_descriptor: str, slow_hwi_listing=False) -> Optional[str]:
+        selected_device = self.get_device(slow_hwi_listing=slow_hwi_listing)
         if not selected_device:
             return None
 
