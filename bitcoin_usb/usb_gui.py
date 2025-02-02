@@ -112,8 +112,10 @@ class USBGui(QObject):
                 self.signal_end_hwi_blocker.emit()
         return None
 
-    def sign(self, psbt: bdk.PartiallySignedTransaction) -> Optional[bdk.PartiallySignedTransaction]:
-        selected_device = self.get_device()
+    def sign(
+        self, psbt: bdk.PartiallySignedTransaction, slow_hwi_listing=False
+    ) -> Optional[bdk.PartiallySignedTransaction]:
+        selected_device = self.get_device(slow_hwi_listing=slow_hwi_listing)
         if not selected_device:
             return None
 
