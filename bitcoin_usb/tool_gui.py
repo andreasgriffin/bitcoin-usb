@@ -36,13 +36,23 @@ class ToolGui(QMainWindow):
         tab_widget = QTabWidget(self)
         main_widget_layout.addWidget(tab_widget)
 
+        # Tab 0: Unlock
+        unlock_tab = QWidget()
+        unlock_layout = QVBoxLayout(unlock_tab)
+        button = SpinningButton(
+            text=self.tr("Unlock Devices"), enable_signal=self.usb.signal_end_hwi_blocker, parent=unlock_tab
+        )
+        button.clicked.connect(self.on_button_unlock_clicked)
+        unlock_layout.addWidget(button)
+        tab_widget.addTab(unlock_tab, self.tr("Unlock"))
+
         # Tab 1: XPUBs
         xpubs_tab = QWidget()
         xpubs_layout = QVBoxLayout(xpubs_tab)
         self.button = SpinningButton(
             text=self.tr("Get xpubs"), enable_signal=self.usb.signal_end_hwi_blocker, parent=xpubs_tab
         )
-        self.button.clicked.connect(self.on_button_clicked)
+        self.button.clicked.connect(self.on_button_xpubs_clicked)
         xpubs_layout.addWidget(self.button)
         self.xpubs_text_edit = QTextEdit(xpubs_tab)
         self.xpubs_text_edit.setReadOnly(True)
@@ -146,7 +156,10 @@ class ToolGui(QMainWindow):
         if signed_psbt:
             self.psbt_text_edit.setText(signed_psbt.serialize())
 
-    def on_button_clicked(self) -> None:
+    def on_button_unlock_clicked(self) -> None:
+        self.usb.get_fingerprint_and_xpubs(slow_hwi_listing=True)
+
+    def on_button_xpubs_clicked(self) -> None:
         self.xpubs_text_edit.setText("")
         fingerprint_and_xpus = self.usb.get_fingerprint_and_xpubs()
 
