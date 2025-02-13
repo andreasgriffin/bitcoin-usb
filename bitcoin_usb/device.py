@@ -6,7 +6,6 @@ from typing import Callable
 
 import hwilib.commands as hwi_commands
 from hwilib.common import Chain
-from hwilib.descriptor import MultisigDescriptor as HWIMultisigDescriptor
 from hwilib.devices.bitbox02 import Bitbox02Client, CLINoiseConfig
 from hwilib.devices.bitbox02_lib import bitbox02
 from hwilib.devices.bitbox02_lib.communication import devices as bitbox02devices
@@ -35,6 +34,7 @@ import bdkpython as bdk
 from .address_types import (
     AddressType,
     DescriptorInfo,
+    SortedMultisigDescriptor,
     get_all_address_types,
     get_hwi_address_type,
 )
@@ -402,10 +402,9 @@ class USBDevice(BaseDevice, QObject):
             ]
             return self.client.display_multisig_address(
                 get_hwi_address_type(desc_infos.address_type),
-                HWIMultisigDescriptor(
+                SortedMultisigDescriptor(
                     pubkeys=pubkey_providers,
                     thresh=desc_infos.threshold,
-                    is_sorted=True,
                 ),
             )
         else:
