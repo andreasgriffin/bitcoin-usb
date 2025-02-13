@@ -22,6 +22,21 @@ from hwilib.descriptor import (
 from hwilib.key import KeyOriginInfo
 
 
+class SortedMultisigDescriptor(MultisigDescriptor):
+    def __init__(self, pubkeys: List[PubkeyProvider], thresh: int) -> None:
+        super().__init__(pubkeys, thresh, True)
+
+    @classmethod
+    def is_sorted_multisig(cls, descriptor: Descriptor) -> bool:
+        return isinstance(descriptor, MultisigDescriptor) and descriptor.is_sorted
+
+    @classmethod
+    def from_multisig_descriptor(cls, descriptor: Descriptor):
+        assert isinstance(descriptor, MultisigDescriptor)
+        assert descriptor.is_sorted
+        return cls(descriptor.pubkeys, descriptor.thresh)
+
+
 class ConstDerivationPaths:
     receive = "/0/*"
     change = "/1/*"
@@ -136,7 +151,7 @@ class AddressTypes:
         bdk_descriptor_secret=None,
         info_url="https://github.com/bitcoin/bips/blob/master/bip-0048.mediawiki",
         description="Nested (multi sig) addresses that look like 3addresses",
-        hwi_descriptor_classes=(SHDescriptor, WSHDescriptor, MultisigDescriptor),
+        hwi_descriptor_classes=(SHDescriptor, WSHDescriptor, SortedMultisigDescriptor),
     )
     p2wsh = AddressType(
         "p2wsh",
@@ -146,7 +161,7 @@ class AddressTypes:
         bdk_descriptor_secret=None,
         info_url="https://github.com/bitcoin/bips/blob/master/bip-0048.mediawiki",
         description="SegWit (multi sig) addresses that look like bc1addresses",
-        hwi_descriptor_classes=(WSHDescriptor, MultisigDescriptor),
+        hwi_descriptor_classes=(WSHDescriptor, SortedMultisigDescriptor),
     )
 
 
@@ -300,15 +315,33 @@ class SimplePubKeyProvider:
 
 
 def _get_descriptor_instances(descriptor: Descriptor) -> List[Descriptor]:
-    "Returns the linear chain of chained descriptors . Multiple subdescriptors return an error"
+    """
+    Returns the linear chain of chained descriptors, and converts MultisigDescriptor into SortedMultisigDescriptor if possible.
+    Multiple subdescriptors return an error
+
+
+    Args:
+        descriptor (Descriptor): _description_
+
+    Returns:
+        List[Descriptor]: _description_
+    """
     assert len(descriptor.subdescriptors) <= 1
     if descriptor.subdescriptors:
-        result = [descriptor]
+        result = [
+            SortedMultisigDescriptor.from_multisig_descriptor(descriptor)
+            if SortedMultisigDescriptor.is_sorted_multisig(descriptor)
+            else descriptor
+        ]
         for subdescriptor in descriptor.subdescriptors:
             result += _get_descriptor_instances(subdescriptor)
         return result
     else:
-        return [descriptor]
+        return [
+            SortedMultisigDescriptor.from_multisig_descriptor(descriptor)
+            if SortedMultisigDescriptor.is_sorted_multisig(descriptor)
+            else descriptor
+        ]
 
 
 def _find_matching_address_type(
@@ -348,11 +381,13 @@ class DescriptorInfo:
                 )
 
         if self.address_type.is_multisig:
-            assert self.address_type.hwi_descriptor_classes[-1] == MultisigDescriptor
-            hwi_descriptor = MultisigDescriptor(
+            assert (
+                self.address_type.hwi_descriptor_classes[-1] != MultisigDescriptor
+            )  # multi() is not suuported, and may not be added in AddressType
+            assert self.address_type.hwi_descriptor_classes[-1] == SortedMultisigDescriptor
+            hwi_descriptor = SortedMultisigDescriptor(
                 pubkeys=[provider.to_hwi_pubkey_provider() for provider in self.spk_providers],
                 thresh=self.threshold,
-                is_sorted=True,
             )
         else:
             hwi_descriptor = self.address_type.hwi_descriptor_classes[-1](
@@ -369,12 +404,24 @@ class DescriptorInfo:
 
     @classmethod
     def from_str(cls, descriptor_str: str) -> "DescriptorInfo":
+        """
+        Requres the descriptor_str to be a nested chain of descriptors, that have at most 1 branch
+        If there are more than 1 subdescriptors (branches), it will raise an Exception
+
+        Args:
+            descriptor_str (str): _description_
+
+        Raises:
+            ValueError: _description_
+
+        Returns:
+            DescriptorInfo: _description_
+        """
         hwi_descriptor = parse_descriptor(descriptor_str)
+        linear_chain_descriptors = _get_descriptor_instances(hwi_descriptor)
 
         # first we need to identify the address type
-        address_type = _find_matching_address_type(
-            _get_descriptor_instances(hwi_descriptor), get_all_address_types()
-        )
+        address_type = _find_matching_address_type(linear_chain_descriptors, get_all_address_types())
         if not address_type:
             supported_types = [address_type.short_name for address_type in get_all_address_types()]
             raise ValueError(
@@ -383,16 +430,12 @@ class DescriptorInfo:
 
         # get the     pubkey_providers, by "walking to the end of desciptors"
         threshold = 1
-        subdescriptor = hwi_descriptor
-        for descritptor_class in address_type.hwi_descriptor_classes:
-            # just double checking that _find_matching_address_type did its job correctly
-            assert isinstance(subdescriptor, descritptor_class)
-            subdescriptor = subdescriptor.subdescriptors[0] if subdescriptor.subdescriptors else subdescriptor
+        last_descriptor = linear_chain_descriptors[-1]
 
-        pubkey_providers = subdescriptor.pubkeys
-        if isinstance(subdescriptor, MultisigDescriptor):
+        pubkey_providers = last_descriptor.pubkeys
+        if isinstance(last_descriptor, MultisigDescriptor):
             # last descriptor is a multisig
-            threshold = subdescriptor.thresh
+            threshold = last_descriptor.thresh
 
         return DescriptorInfo(
             address_type=address_type,
