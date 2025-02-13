@@ -315,7 +315,17 @@ class SimplePubKeyProvider:
 
 
 def _get_descriptor_instances(descriptor: Descriptor) -> List[Descriptor]:
-    "Returns the linear chain of chained descriptors . Multiple subdescriptors return an error"
+    """
+    Returns the linear chain of chained descriptors, and converts MultisigDescriptor into SortedMultisigDescriptor if possible.
+    Multiple subdescriptors return an error
+
+
+    Args:
+        descriptor (Descriptor): _description_
+
+    Returns:
+        List[Descriptor]: _description_
+    """
     assert len(descriptor.subdescriptors) <= 1
     if descriptor.subdescriptors:
         result = [
