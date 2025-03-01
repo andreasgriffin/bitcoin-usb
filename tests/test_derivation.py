@@ -1,11 +1,12 @@
 from bitcoin_usb.address_types import (
     AddressTypes,
     DescriptorInfo,
+    SimplePubKeyProvider,
     bdk,
     get_all_address_types,
     logging,
 )
-from bitcoin_usb.seed_tools import derive_spk_provider, get_network_index
+from bitcoin_usb.seed_tools import derive_spk_provider
 
 # test seeds
 # seed1: spider manual inform reject arch raccoon betray moon document across main build
@@ -217,9 +218,9 @@ def test_multisig_unusual_key_origin(caplog):
 
 
 def test_get_network_index():
-    assert get_network_index("m/48h/0h/0h/2h") == 0
-    assert get_network_index("m/48h/1h/0h/2h") == 1
+    assert SimplePubKeyProvider.get_network_index("m/48h/0h/0h/2h") == 0
+    assert SimplePubKeyProvider.get_network_index("m/48h/1h/0h/2h") == 1
 
-    assert get_network_index("m/48h/1/0h/2h") == None
+    assert SimplePubKeyProvider.get_network_index("m/48h/1/0h/2h") == None
 
-    assert get_network_index("m/4") == None
+    assert SimplePubKeyProvider.get_network_index("m/4") == None

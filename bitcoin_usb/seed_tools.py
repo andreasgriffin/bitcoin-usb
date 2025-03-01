@@ -1,5 +1,5 @@
 import logging
-from typing import Optional, Tuple
+from typing import Tuple
 
 import bdkpython as bdk
 from bitcointx import select_chain_params
@@ -9,21 +9,6 @@ from mnemonic import Mnemonic
 logger = logging.getLogger(__name__)
 
 from .address_types import SimplePubKeyProvider
-
-
-def get_network_index(key_origin: str) -> Optional[int]:
-    splitted = key_origin.split("/")
-    if len(splitted) < 3:
-        logger.warning(f"{key_origin} has too few levels for a network_index")
-        return None
-
-    network_str = splitted[2]
-    if not network_str.endswith("h"):
-        logger.warning(f"The network index ({network_str}) must be hardened")
-        return None
-
-    network_index = int(network_str.replace("h", ""))
-    return network_index
 
 
 def get_mnemonic_seed(mnemonic: str):
