@@ -13,7 +13,7 @@ from bitcoin_usb.address_types import AddressType
 from bitcoin_usb.dialogs import DeviceDialog, ThreadedWaitingDialog, get_message_box
 from bitcoin_usb.hwi_quick import HWIQuick
 
-from .device import USBDevice
+from .device import USBDevice, bdknetwork_to_chain
 from .i18n import translate
 
 logger = logging.getLogger(__name__)
@@ -76,7 +76,9 @@ class USBGui(QObject):
                     ]
 
                 devices = ThreadedWaitingDialog(
-                    func=lambda: hwi_commands.enumerate(allow_emulators=allow_emulators),
+                    func=lambda: hwi_commands.enumerate(
+                        allow_emulators=allow_emulators, chain=bdknetwork_to_chain(self.network)
+                    ),
                     title=self.tr("Unlock USB devices"),
                     message=self.tr("Please unlock USB devices"),
                 ).get_result()

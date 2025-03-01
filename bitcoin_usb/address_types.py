@@ -19,7 +19,13 @@ from hwilib.descriptor import (
     WSHDescriptor,
     parse_descriptor,
 )
-from hwilib.key import KeyOriginInfo
+from hwilib.key import (
+    HARDENED_FLAG,
+    ExtendedKey,
+    KeyOriginInfo,
+    is_hardened,
+    parse_path,
+)
 
 
 class SortedMultisigDescriptor(MultisigDescriptor):
@@ -206,7 +212,11 @@ class SimplePubKeyProvider:
         key_origin: str,
         derivation_path: str = ConstDerivationPaths.receive,
     ) -> None:
-        self.xpub = xpub.strip()
+        xpub = xpub.strip()
+        self.xpub = ExtendedKey.deserialize(xpub).to_string()
+        if self.xpub != xpub:
+            raise ValueError(f"xpub {xpub} changed during deserialize/serialize!")
+
         self.fingerprint = self.format_fingerprint(fingerprint)
         # key_origin example: "m/84h/1h/0h"
         self.key_origin = self.format_key_origin(key_origin)
@@ -223,32 +233,98 @@ class SimplePubKeyProvider:
         return value.replace("'", "h")
 
     @classmethod
-    def format_key_origin(cls, value: str) -> str:
-        def filter_characters(s):
-            allowed_chars = set("m/'h0123456789")
-            filtered_string = "".join(c for c in s if c in allowed_chars)
-            return filtered_string
-
-        value = filter_characters(value.replace("'", "h").strip())
+    def format_key_origin(cls, value: str, remove_spaces=True) -> str:
+        if remove_spaces:
+            value = value.replace(" ", "")
         if value == "m":
             # handle the special case that the key is the highest key without derivation
             return value
 
-        for group in value.split("/"):
-            if group.count("h") > 1:
-                raise ValueError(translate("bitcoin_usb", "h cannot appear twice in a index"))
+        # must pass the hwi parsing test
+        indexes = parse_path(value)
+        assert indexes, "Could not parse the key origin"
 
-        if not value.startswith("m/"):
-            raise ValueError(translate("bitcoin_usb", "{value} must start with m/").format(value=value))
-        if "//" in value:
-            raise ValueError(translate("bitcoin_usb", "{value} cannot contain //").format(value=value))
-        if "/h" in value:
-            raise ValueError(translate("bitcoin_usb", "{value} cannot contain /h").format(value=value))
-        if "hh" in value:
-            raise ValueError(translate("bitcoin_usb", "{value} cannot contain hh").format(value=value))
-        if value.endswith("/"):
-            raise ValueError(translate("bitcoin_usb", "{value} cannot end with /").format(value=value))
-        return value
+        return cls.key_origin_indexes_to_str(indexes)
+
+    @classmethod
+    def robust_parse_path(cls, key_origin: str) -> Optional[List[int]]:
+        # normalize the input and ensure it is valid
+        try:
+            indexes = parse_path(key_origin)
+        except:
+            return None
+        return indexes
+
+    @classmethod
+    def get_network_index(cls, key_origin: str) -> Optional[int]:
+        # normalize the input and ensure it is valid
+        indexes = cls.robust_parse_path(key_origin)
+        if not indexes:
+            return None
+
+        if len(indexes) < 2:
+            logger.warning(f"{key_origin} has too few levels for a network_index")
+            return None
+
+        index_network = indexes[1]
+
+        if not is_hardened(index_network):
+            logger.warning(f"The network index ({index_network}) must be hardened")
+            return None
+
+        return index_network & ~HARDENED_FLAG
+
+    @classmethod
+    def get_account_index(cls, key_origin: str) -> Optional[int]:
+        # normalize the input and ensure it is valid
+        indexes = cls.robust_parse_path(key_origin)
+        if not indexes:
+            return None
+
+        if len(indexes) < 2:
+            logger.warning(f"{key_origin} has too few levels for a account_index")
+            return None
+
+        index_network = indexes[2]
+
+        if not is_hardened(index_network):
+            logger.warning(f"The account_index ({index_network}) must be hardened")
+            return None
+
+        return index_network & ~HARDENED_FLAG
+
+    @classmethod
+    def key_origin_indexes_to_str(cls, indexes: List[int]) -> str:
+        def _path_string(self, hardened_char: str = "h") -> str:
+            s = ""
+            for i in indexes:
+                hardened = is_hardened(i)
+                i &= ~HARDENED_FLAG
+                s += "/" + str(i)
+                if hardened:
+                    s += hardened_char
+            return s
+
+        return f"m{_path_string(indexes)}"
+
+    @classmethod
+    def key_origin_identical_disregarding_account(
+        cls,
+        key_origin1: str,
+        key_origin2: str,
+    ) -> bool:
+        indexes2 = cls.robust_parse_path(key_origin2)
+        if indexes2 is None:
+            return False
+
+        a1, a2 = cls.get_account_index(key_origin1), cls.get_account_index(key_origin2)
+        if a1 is None or a2 is None:
+            return False
+
+        indexes2_with_a1 = indexes2.copy()
+        indexes2_with_a1[2] = a1 | HARDENED_FLAG
+
+        return key_origin1 == cls.key_origin_indexes_to_str(indexes2_with_a1)
 
     @classmethod
     def is_fingerprint_valid(cls, fingerprint: str):
