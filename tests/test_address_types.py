@@ -295,10 +295,7 @@ def test_get_account_index_valid1():
 def test_get_account_index_too_few_levels():
     # A key origin with only two indexes (after "m/") should not have an account index.
     key_origin = "m/44h/0h"
-    # According to the code the check is "if len(indexes) < 2:" which passes if len(indexes)==2,
-    # and then it will try to access indexes[2] and trigger an IndexError.
-    with pytest.raises(IndexError):
-        SimplePubKeyProvider.get_account_index(key_origin)
+    assert SimplePubKeyProvider.get_account_index(key_origin) is None
 
 
 def test_get_account_index_not_hardened1():

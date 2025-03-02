@@ -281,7 +281,7 @@ class SimplePubKeyProvider:
         if not indexes:
             return None
 
-        if len(indexes) < 2:
+        if len(indexes) < 3:
             logger.warning(f"{key_origin} has too few levels for a account_index")
             return None
 
