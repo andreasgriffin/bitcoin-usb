@@ -389,6 +389,9 @@ class SimplePubKeyProvider:
     def __repr__(self) -> str:
         return f"{self.__class__.__name__}({self.__dict__})"
 
+    def get_address_bip32_path(self, kind: bdk.KeychainKind, index: int):
+        return f"{self.key_origin}/{0 if kind == bdk.KeychainKind.EXTERNAL else 1}/{index}"
+
 
 def _get_descriptor_instances(descriptor: Descriptor) -> List[Descriptor]:
     """
