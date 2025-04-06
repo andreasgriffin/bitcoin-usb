@@ -32,6 +32,7 @@ def get_message_box(
 # Worker class for the blocking operation
 class Worker(QObject):
     finished = pyqtSignal(object)
+    error = pyqtSignal(Exception)  # New signal for errors
 
     def __init__(self, func, *args, **kwargs):
         super().__init__()
@@ -40,9 +41,11 @@ class Worker(QObject):
         self.kwargs = kwargs
 
     def run(self):
-        # Run the passed function with its arguments
-        result = self.func(*self.args, **self.kwargs)
-        self.finished.emit(result)  # Emit the signal with the result
+        try:
+            result = self.func(*self.args, **self.kwargs)
+            self.finished.emit(result)  # Emit the result if successful
+        except Exception as e:
+            self.error.emit(e)  # Emit error if an exception occurs
 
 
 class ThreadedWaitingDialog(QDialog):
@@ -62,20 +65,29 @@ class ThreadedWaitingDialog(QDialog):
         self._thread = QThread()
         self.worker.moveToThread(self._thread)
         self.worker.finished.connect(self.handle_func_result)
+        self.worker.error.connect(self.handle_func_error)  # Connect error signal
         self._thread.started.connect(self.worker.run)
 
         self.loop = QEventLoop()  # Event loop to block for synchronous execution
+        self.exception = None  # To store an exception, if it occurs
 
     def handle_func_result(self, result):
         self.result = result
         if self.loop.isRunning():
             self.loop.exit()  # Exit the loop only if it's running
 
+    def handle_func_error(self, exception):
+        self.exception = exception
+        if self.loop.isRunning():
+            self.loop.exit()  # Exit the loop when an error is encountered
+
     def get_result(self):
         self.show()  # Show the dialog
         self._thread.start()  # Start the thread
-        self.loop.exec()  # Block here until the operation finishes
+        self.loop.exec()  # Block here until the operation finishes or errors out
         self.close()  # Close the dialog
+        if self.exception:
+            raise self.exception  # Re-raise the exception after closing the dialog
         return self.result
 
     def closeEvent(self, event):
