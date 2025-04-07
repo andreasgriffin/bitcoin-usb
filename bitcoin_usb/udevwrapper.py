@@ -50,21 +50,19 @@ class UDevWrapper:
         # Make the temporary script executable
         os.chmod(temp_script_path, 0o755)
 
-        # Command to be executed with sudo
-        full_cmd = f"bash {temp_script_path}"
-
         # Find a terminal emulator that is available and execute the script
         try:
             found_terminal = False
             for terminal in terminals:
                 if shutil.which(terminal):
                     found_terminal = True
-                    exec_cmd = [terminal, "-e", full_cmd]
                     if terminal == "konsole":
-                        exec_cmd = [terminal, "-e", full_cmd]  # Removed --hold
+                        cmd = [terminal, "-e", "bash", temp_script_path]
                     elif terminal in ["gnome-terminal", "xfce4-terminal"]:
-                        exec_cmd = [terminal, "-x", full_cmd]
-                    subprocess.run(exec_cmd)
+                        cmd = [terminal, "-x", "bash", temp_script_path]
+                    else:
+                        cmd = [terminal, "-e", "bash", temp_script_path]
+                    subprocess.run(cmd)
                     break
             if not found_terminal:
                 print(translate("bitcoin_usb", "No suitable terminal emulator found."), file=sys.stderr)
