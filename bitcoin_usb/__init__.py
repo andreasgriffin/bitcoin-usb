@@ -1,1 +1,0 @@
-from bitcointx import set_custom_secp256k1_path

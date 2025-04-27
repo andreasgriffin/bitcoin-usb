@@ -1,3 +1,5 @@
+import bdkpython as bdk
+
 from bitcoin_usb.address_types import (
     AddressTypes,
     DescriptorInfo,
@@ -39,10 +41,8 @@ def test_compare_single_sig_key_derivation_with_bdk_templates():
             spk_provider = derive_spk_provider(test_seed, address_type.key_origin(network), network)
 
             desc_info = DescriptorInfo(address_type, [spk_provider])
-            assert descriptor.as_string() == desc_info.get_hwi_descriptor(network).to_string(
-                hardened_char="'"
-            )
-            assert descriptor.as_string() == desc_info.get_bdk_descriptor(network).as_string()
+            assert str(descriptor) == desc_info.get_hwi_descriptor(network).to_string(hardened_char="'")
+            assert str(descriptor) == desc_info.get_descriptor_str(network, hardened_char="'")
 
 
 def test_correct_p2sh_p2wsh_derivation():
@@ -175,8 +175,8 @@ def test_multisig():
             network,
         ),
     ]
-    descriptor = DescriptorInfo(AddressTypes.p2wsh, spk_providers, 2).get_bdk_descriptor(network)
-    stripped = descriptor.as_string().split("#")[0].replace("'", "h")
+    descriptor = DescriptorInfo(AddressTypes.p2wsh, spk_providers, 2).get_descriptor_str(network)
+    stripped = descriptor.split("#")[0].replace("'", "h")
     # comparision created with sparrow (had to reorder the pubkey_providers)
     assert (
         stripped
@@ -203,8 +203,8 @@ def test_multisig_unusual_key_origin(caplog):
             network,
         ),
     ]
-    descriptor = DescriptorInfo(AddressTypes.p2wsh, spk_providers, 2).get_bdk_descriptor(network)
-    stripped = descriptor.as_string().split("#")[0].replace("'", "h")
+    descriptor = DescriptorInfo(AddressTypes.p2wsh, spk_providers, 2).get_descriptor_str(network)
+    stripped = descriptor.split("#")[0].replace("'", "h")
     # comparision created with sparrow (had to reorder the pubkey_providers)
     assert (
         stripped

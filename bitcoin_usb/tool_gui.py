@@ -150,7 +150,7 @@ class ToolGui(QMainWindow):
             self.message_text_edit.setText(signed_message)
 
     def sign(self) -> None:
-        psbt = bdk.PartiallySignedTransaction(self.psbt_text_edit.toPlainText())
+        psbt = bdk.Psbt(self.psbt_text_edit.toPlainText())
         self.psbt_text_edit.setText("")
         signed_psbt = self.usb.sign(psbt)
         if signed_psbt:

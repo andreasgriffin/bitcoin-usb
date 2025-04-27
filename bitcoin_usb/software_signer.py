@@ -2,26 +2,37 @@ import logging
 from typing import Dict, List
 
 import bdkpython as bdk
+from hwilib.descriptor import parse_descriptor
+
+from .address_types import (
+    AddressType,
+    AddressTypes,
+    DescriptorInfo,
+    get_all_address_types,
+)
+from .device import BaseDevice
+from .seed_tools import derive
 
 logger = logging.getLogger(__name__)
-import base64
-
-from bitcointx import select_chain_params
-from bitcointx.core.key import BIP32PathTemplate, KeyStore
-from bitcointx.core.psbt import (
-    PartiallySignedTransaction as TXPartiallySignedTransaction,
-)
-from bitcointx.wallet import CCoinExtKey
-
-from .address_types import AddressType, AddressTypes, get_all_address_types
-from .device import BaseDevice
-from .seed_tools import derive, get_mnemonic_seed
 
 
 class SoftwareSigner(BaseDevice):
-    def __init__(self, mnemonic: str, network: bdk.Network) -> None:
+    def __init__(
+        self,
+        mnemonic: str,
+        receive_descriptor: str,
+        change_descriptor: str,
+        network: bdk.Network,
+    ) -> None:
         super().__init__(network=network)
         self.mnemonic = mnemonic
+
+        self.wallet = bdk.Wallet(
+            descriptor=self._replace_xpubs_with_xprivs(receive_descriptor),
+            change_descriptor=self._replace_xpubs_with_xprivs(change_descriptor),
+            network=self.network,
+            connection=bdk.Connection.new_in_memory(),
+        )
 
     def derive(self, key_origin: str):
         xpub, fingerprint = derive(self.mnemonic, key_origin, self.network)
@@ -40,7 +51,7 @@ class SoftwareSigner(BaseDevice):
             xpubs[address_type] = xpub
         return xpubs
 
-    def _extract_derivation_paths(self, input_psbt: bdk.PartiallySignedTransaction) -> List["str"]:
+    def _extract_derivation_paths(self, input_psbt: bdk.Psbt) -> List["str"]:
         import json
 
         psbt_json = json.loads(input_psbt.json_serialize())
@@ -57,43 +68,48 @@ class SoftwareSigner(BaseDevice):
 
         return derivation_paths
 
-    def sign_psbt(self, input_psbt: bdk.PartiallySignedTransaction) -> bdk.PartiallySignedTransaction:
-        # Select network parameters
-        network_params = {
-            bdk.Network.BITCOIN: "bitcoin",
-            bdk.Network.TESTNET: "bitcoin/testnet",
-            bdk.Network.REGTEST: "bitcoin/regtest",
-            bdk.Network.SIGNET: "bitcoin/signet",
-        }
-        select_chain_params(network_params.get(self.network, "bitcoin"))
+    def _replace_xpubs_with_xprivs(
+        self,
+        descriptor: str,
+    ) -> bdk.Descriptor:
+        """This is necessary, because bdk hasnt got a multisig Descriptor template yet
+        See: https://github.com/bitcoindevkit/bdk-ffi/issues/745
 
-        # Base64-encoded PSBT
-        base64_encoded_psbt = input_psbt.serialize()
+        Args:
+            descriptor (str): _description_
 
-        # Deserialize the PSBT
-        psbt = TXPartiallySignedTransaction.from_base64_or_binary(base64_encoded_psbt)
+        Returns:
+            bdk.Descriptor: _description_
+        """
 
-        ext_key = CCoinExtKey.from_seed(get_mnemonic_seed(self.mnemonic))
+        def strip_derivation_path(s: str) -> str:
+            return s[:-2] if s.endswith("/*") else s
 
-        # Create a keystore and add the extended key with the path template
-        keystore = KeyStore()
-        for path in self._extract_derivation_paths(input_psbt):
-            # Define a path template for the key
-            keystore.add_key((ext_key, BIP32PathTemplate(path)))
+        mnemonic = bdk.Mnemonic.from_string(self.mnemonic)
+        root_secret_key = bdk.DescriptorSecretKey(self.network, mnemonic, "")
+        info = DescriptorInfo.from_str(descriptor)
 
-        # Sign the PSBT
-        psbt.sign(keystore)
+        # bdk works with hardened_char="'" by default and we need to ensure descriptor_with_secret then also has hardened_char="'"
+        descriptor_with_secret = parse_descriptor(descriptor).to_string_no_checksum(hardened_char="'")
+        for spk_provider in info.spk_providers:
+            derived_secret = root_secret_key.derive(bdk.DerivationPath(spk_provider.key_origin))
+            derived_pub_str = strip_derivation_path(derived_secret.as_public().as_string())
+            if spk_provider.xpub in derived_pub_str:
+                descriptor_with_secret = descriptor_with_secret.replace(
+                    derived_pub_str, strip_derivation_path(derived_secret.as_string())
+                )
 
-        # Check if the PSBT is finalized (optional, based on your requirements)
-        # If not finalized, you might want to handle it differently
+        return bdk.Descriptor(descriptor=descriptor_with_secret, network=self.network)
 
-        # Serialize the PSBT after signing
-        signed_psbt = psbt.serialize()
+    def sign_psbt(self, input_psbt: bdk.Psbt) -> bdk.Psbt | None:
 
-        # Encode the signed PSBT back to Base64
-        signed_base64_psbt = base64.b64encode(signed_psbt).decode()
-
-        return bdk.PartiallySignedTransaction(signed_base64_psbt)
+        previous_serialized = input_psbt.serialize()
+        fully_signed = self.wallet.sign(psbt=input_psbt, sign_options=None)
+        if fully_signed:
+            return input_psbt
+        if input_psbt.serialize() == previous_serialized:
+            return None
+        return input_psbt
 
     def sign_message(self, message: str, bip32_path: str) -> str:
         raise NotImplementedError("")

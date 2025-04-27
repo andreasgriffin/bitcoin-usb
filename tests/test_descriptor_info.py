@@ -88,6 +88,20 @@ def test_wpkh():
     }
 
 
+def test_root_tpriv():
+    s = "wpkh(tprv8ZgxMBicQKsPdCB2hz2xxrbQUL1kNfVhEqJ3gLY8ASDyaKsqmxPCBjJMASPVqBJeCdqQJ4S9uE1MY51orSE8FmsyPsgKjsQ6SBQQ1CkmrDA/84'/1'/0'/0/*)#fr0quayd"
+    info = DescriptorInfo.from_str(s)
+    assert info.address_type.short_name == "p2wpkh"
+    assert len(info.spk_providers) == 1
+
+    assert info.spk_providers[0].__dict__ == {
+        "xpub": "tprv8ZgxMBicQKsPdCB2hz2xxrbQUL1kNfVhEqJ3gLY8ASDyaKsqmxPCBjJMASPVqBJeCdqQJ4S9uE1MY51orSE8FmsyPsgKjsQ6SBQQ1CkmrDA",
+        "fingerprint": "00B43264",
+        "key_origin": "m",
+        "derivation_path": "/84h/1h/0h/0/*",
+    }
+
+
 def test_tr():
     s = "tr([fc70ecd1/86'/1'/0']tpubDDjw7hTGCWodCZGZqW8mLoJ5kmyRtwouKvs589XfZa4rSXBEzz418LjwzBGiz7QeDoSPYZGy2eCGw3RVcwM4mV93TRBsAHuHb7YfqVQXN32/<0;1>/*)#z3x0aash"
     info = DescriptorInfo.from_str(s)

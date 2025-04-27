@@ -1,8 +1,9 @@
+import bdkpython as bdk
 import pytest
 from hwilib.errors import BadArgumentError
 from hwilib.key import HARDENED_FLAG
 
-from bitcoin_usb.address_types import AddressTypes, SimplePubKeyProvider, bdk
+from bitcoin_usb.address_types import AddressTypes, SimplePubKeyProvider
 
 # test seeds
 # seed1: spider manual inform reject arch raccoon betray moon document across main build

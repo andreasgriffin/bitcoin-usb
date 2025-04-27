@@ -1,9 +1,4 @@
 import logging
-
-from bitcoin_usb.i18n import translate
-
-logger = logging.getLogger(__name__)
-
 from typing import Callable, Dict, List, Optional, Sequence, Type
 
 import bdkpython as bdk
@@ -26,6 +21,10 @@ from hwilib.key import (
     is_hardened,
     parse_path,
 )
+
+from bitcoin_usb.i18n import translate
+
+logger = logging.getLogger(__name__)
 
 
 class SortedMultisigDescriptor(MultisigDescriptor):
@@ -212,6 +211,18 @@ class SimplePubKeyProvider:
         key_origin: str,
         derivation_path: str = ConstDerivationPaths.receive,
     ) -> None:
+        """
+        The hardened character is by default "h"
+
+        Args:
+            xpub (str): _description_
+            fingerprint (str): _description_
+            key_origin (str): _description_
+            derivation_path (str, optional): _description_. Defaults to ConstDerivationPaths.receive.
+
+        Raises:
+            ValueError: _description_
+        """
         xpub = xpub.strip()
         self.xpub = ExtendedKey.deserialize(xpub).to_string()
         if self.xpub != xpub:
@@ -370,10 +381,19 @@ class SimplePubKeyProvider:
 
     @classmethod
     def from_hwi(cls, pubkey_provider: PubkeyProvider) -> "SimplePubKeyProvider":
+        if pubkey_provider.origin:
+            fingerprint = pubkey_provider.origin.fingerprint.hex()
+            key_origin = pubkey_provider.origin.get_derivation_path()
+        else:
+            # xpriv is in pubkey_provider.pubkey
+            root_secret_key = bdk.DescriptorSecretKey.from_string(pubkey_provider.pubkey)
+            fingerprint = root_secret_key.as_public().master_fingerprint()
+            key_origin = "m"
+
         return SimplePubKeyProvider(
             xpub=pubkey_provider.pubkey,
-            fingerprint=pubkey_provider.origin.fingerprint.hex(),
-            key_origin=pubkey_provider.origin.get_derivation_path(),
+            fingerprint=fingerprint,
+            key_origin=key_origin,
             derivation_path=pubkey_provider.deriv_path,
         )
 
@@ -478,8 +498,8 @@ class DescriptorInfo:
 
         return hwi_descriptor
 
-    def get_bdk_descriptor(self, network: bdk.Network):
-        return bdk.Descriptor(self.get_hwi_descriptor(network).to_string(), network=network)
+    def get_descriptor_str(self, network: bdk.Network, hardened_char="h"):
+        return self.get_hwi_descriptor(network).to_string(hardened_char=hardened_char)
 
     @classmethod
     def from_str(cls, descriptor_str: str) -> "DescriptorInfo":

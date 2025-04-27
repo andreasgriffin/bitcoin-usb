@@ -35,7 +35,6 @@ python -m pytest -vvv  --log-cli-level=0
 ### Library Usage
 
 * For xpub derivation bip_utils is used
-* For signing a psbt python-bitcointx is used
 
 
 # Install package
