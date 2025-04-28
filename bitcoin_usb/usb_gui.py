@@ -324,7 +324,11 @@ class USBGui(QObject):
         if os_name == "Linux":
             self.show_error_message_linux(text)
         else:
-            self.show_error_message(text)
+            msg_box = get_message_box(
+                text=text, icon=QMessageBox.Icon.Critical, title=translate("bitcoin_usb", "Error")
+            )
+            # Show the text box and wait for a response
+            msg_box.exec()
 
     def show_error_message_linux(self, text: str) -> None:
         # Create the text box
