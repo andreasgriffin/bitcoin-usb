@@ -44,7 +44,7 @@ def derive(mnemonic: str, key_origin: str, network: bdk.Network) -> Tuple[str, s
     pub_str = strip_derivation_path(derived_secret.as_public().as_string())
     assert "]" in pub_str
 
-    xpub = pub_str.split("]")[1]
+    xpub = pub_str.split("]")[1]  # only take xpub, not key_origin
 
     return xpub, fingerprint
 

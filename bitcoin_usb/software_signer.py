@@ -28,8 +28,12 @@ class SoftwareSigner(BaseDevice):
         self.mnemonic = mnemonic
 
         self.wallet = bdk.Wallet(
-            descriptor=self._replace_xpubs_with_xprivs(receive_descriptor),
-            change_descriptor=self._replace_xpubs_with_xprivs(change_descriptor),
+            descriptor=self._bdk_descriptor_with_secrets(
+                descriptor_public=receive_descriptor, mnemonic_str=mnemonic, network=network
+            ),
+            change_descriptor=self._bdk_descriptor_with_secrets(
+                descriptor_public=change_descriptor, mnemonic_str=mnemonic, network=network
+            ),
             network=self.network,
             connection=bdk.Connection.new_in_memory(),
         )
@@ -68,15 +72,19 @@ class SoftwareSigner(BaseDevice):
 
         return derivation_paths
 
-    def _replace_xpubs_with_xprivs(
-        self,
-        descriptor: str,
+    @classmethod
+    def _bdk_descriptor_with_secrets(
+        cls,
+        mnemonic_str: str,
+        descriptor_public: str,
+        network: bdk.Network,
     ) -> bdk.Descriptor:
-        """This is necessary, because bdk hasnt got a multisig Descriptor template yet
-        See: https://github.com/bitcoindevkit/bdk-ffi/issues/745
+        """
+        Uses the mnemonic to create a descriptor with secrets from a descriptor without secrets
 
-        Args:
-            descriptor (str): _description_
+        This string replacements necessary, because bdk hasnt got a multisig Descriptor template yet,
+        which would allow reconstructing the descriptor from a seed.
+        See: https://github.com/bitcoindevkit/bdk-ffi/issues/745
 
         Returns:
             bdk.Descriptor: _description_
@@ -85,21 +93,25 @@ class SoftwareSigner(BaseDevice):
         def strip_derivation_path(s: str) -> str:
             return s[:-2] if s.endswith("/*") else s
 
-        mnemonic = bdk.Mnemonic.from_string(self.mnemonic)
-        root_secret_key = bdk.DescriptorSecretKey(self.network, mnemonic, "")
-        info = DescriptorInfo.from_str(descriptor)
+        mnemonic = bdk.Mnemonic.from_string(mnemonic_str)
+        root_secret_key = bdk.DescriptorSecretKey(network, mnemonic, "")
+        info = DescriptorInfo.from_str(descriptor_public)
 
         # bdk works with hardened_char="'" by default and we need to ensure descriptor_with_secret then also has hardened_char="'"
-        descriptor_with_secret = parse_descriptor(descriptor).to_string_no_checksum(hardened_char="'")
+        # descriptor_with_secret: "wpkh([7c85f2b5/84'/1'/0']tpub..../0/*)"
+        descriptor_with_secret = parse_descriptor(descriptor_public).to_string_no_checksum(hardened_char="'")
         for spk_provider in info.spk_providers:
+            # derived_secret = "[7c85f2b5/84'/1'/0']tpriv..../*"
             derived_secret = root_secret_key.derive(bdk.DerivationPath(spk_provider.key_origin))
+            # derived_pub_str = "[7c85f2b5/84'/1'/0']tpub...."
             derived_pub_str = strip_derivation_path(derived_secret.as_public().as_string())
             if spk_provider.xpub in derived_pub_str:
+                # descriptor_with_secret = "wpkh([7c85f2b5/84'/1'/0']tpriv..../0/*)"
                 descriptor_with_secret = descriptor_with_secret.replace(
                     derived_pub_str, strip_derivation_path(derived_secret.as_string())
                 )
 
-        return bdk.Descriptor(descriptor=descriptor_with_secret, network=self.network)
+        return bdk.Descriptor(descriptor=descriptor_with_secret, network=network)
 
     def sign_psbt(self, input_psbt: bdk.Psbt) -> bdk.Psbt | None:
 
