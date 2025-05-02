@@ -1,5 +1,5 @@
 import logging
-from typing import Dict, List
+from typing import Dict
 
 import bdkpython as bdk
 from hwilib.descriptor import parse_descriptor
@@ -54,23 +54,6 @@ class SoftwareSigner(BaseDevice):
             xpub, fingerprint = derive(self.mnemonic, address_type.key_origin(self.network), self.network)
             xpubs[address_type] = xpub
         return xpubs
-
-    def _extract_derivation_paths(self, input_psbt: bdk.Psbt) -> List["str"]:
-        import json
-
-        psbt_json = json.loads(input_psbt.json_serialize())
-
-        derivation_paths = []
-
-        # Extract input derivation paths from the "bip32_derivation" field in each input
-        for input_data in psbt_json["inputs"]:
-            bip32_derivation = input_data.get("bip32_derivation")
-            if bip32_derivation:
-                for derivation_info in bip32_derivation:
-                    path = derivation_info[1][-1]  # Get the last element of the path
-                    derivation_paths.append(path)
-
-        return derivation_paths
 
     @classmethod
     def _bdk_descriptor_with_secrets(
