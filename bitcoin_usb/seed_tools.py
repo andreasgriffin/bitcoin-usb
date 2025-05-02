@@ -2,13 +2,11 @@ import logging
 from typing import Tuple
 
 import bdkpython as bdk
-from bitcointx import select_chain_params
-from bitcointx.wallet import CCoinExtKey
 from mnemonic import Mnemonic
 
-logger = logging.getLogger(__name__)
-
 from .address_types import SimplePubKeyProvider
+
+logger = logging.getLogger(__name__)
 
 
 def get_mnemonic_seed(mnemonic: str):
@@ -35,31 +33,18 @@ def derive(mnemonic: str, key_origin: str, network: bdk.Network) -> Tuple[str, s
         Tuple[str, str]: xpub, fingerprint  (where fingerprint is the master fingerprint)
     """
 
-    # Select network parameters
-    network_params = {
-        bdk.Network.BITCOIN: "bitcoin",
-        bdk.Network.TESTNET: "bitcoin/testnet",
-        bdk.Network.REGTEST: "bitcoin/regtest",
-        bdk.Network.SIGNET: "bitcoin/signet",
-    }
-    select_chain_params(network_params.get(network, "bitcoin"))
+    def strip_derivation_path(s: str) -> str:
+        return s[:-2] if s.endswith("/*") else s
 
-    seed_bytes = get_mnemonic_seed(mnemonic)
+    bdk_mnemonic = bdk.Mnemonic.from_string(mnemonic)
+    root_secret_key = bdk.DescriptorSecretKey(network, bdk_mnemonic, "")
+    fingerprint = root_secret_key.as_public().master_fingerprint()
+    derived_secret = root_secret_key.derive(bdk.DerivationPath(key_origin))
 
-    # Create a master extended key from the seed
-    master_key = CCoinExtKey.from_seed(seed_bytes)
+    pub_str = strip_derivation_path(derived_secret.as_public().as_string())
+    assert "]" in pub_str
 
-    if key_origin == "m":
-        derived_key = master_key
-    else:
-        # Derive the xpub at the specified origin
-        derived_key = master_key.derive_path(key_origin)
-
-    # Extract xpub
-    xpub = str(derived_key.neuter())
-
-    # Get the fingerprint
-    fingerprint = master_key.fingerprint.hex()
+    xpub = pub_str.split("]")[1]  # only take xpub, not key_origin
 
     return xpub, fingerprint
 

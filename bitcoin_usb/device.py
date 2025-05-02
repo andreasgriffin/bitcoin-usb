@@ -2,8 +2,9 @@ import logging
 import threading
 from abc import abstractmethod
 from pathlib import Path
-from typing import Callable
+from typing import Any, Callable, Dict, Optional
 
+import bdkpython as bdk
 import hwilib.commands as hwi_commands
 from hwilib.common import Chain
 from hwilib.devices.bitbox02 import Bitbox02Client, CLINoiseConfig
@@ -26,11 +27,6 @@ from bitcoin_usb.dialogs import Worker
 from bitcoin_usb.i18n import translate
 from bitcoin_usb.util import run_script
 
-logger = logging.getLogger(__name__)
-from typing import Any, Callable, Dict, Optional
-
-import bdkpython as bdk
-
 from .address_types import (
     AddressType,
     DescriptorInfo,
@@ -38,6 +34,8 @@ from .address_types import (
     get_all_address_types,
     get_hwi_address_type,
 )
+
+logger = logging.getLogger(__name__)
 
 
 def create_custom_message_box(
@@ -183,11 +181,11 @@ class ThreadedCapturePrintDialogBitBox02(QDialog):
 def bdknetwork_to_chain(network: bdk.Network):
     if network == bdk.Network.BITCOIN:
         return Chain.MAIN
-    if network == bdk.Network.REGTEST:
+    elif network == bdk.Network.REGTEST:
         return Chain.REGTEST
-    if network == bdk.Network.SIGNET:
+    elif network == bdk.Network.SIGNET:
         return Chain.SIGNET
-    if network == bdk.Network.TESTNET:
+    elif network in [bdk.Network.TESTNET, bdk.Network.TESTNET4]:
         return Chain.TEST
 
 
@@ -204,7 +202,7 @@ class BaseDevice:
         pass
 
     @abstractmethod
-    def sign_psbt(self, psbt: bdk.PartiallySignedTransaction) -> bdk.PartiallySignedTransaction:
+    def sign_psbt(self, psbt: bdk.Psbt) -> bdk.Psbt:
         pass
 
     @abstractmethod
@@ -374,7 +372,7 @@ class USBDevice(BaseDevice, QObject):
         assert self.client
         return self.client.get_pubkey_at_path(key_origin).to_string()
 
-    def sign_psbt(self, psbt: bdk.PartiallySignedTransaction) -> bdk.PartiallySignedTransaction:
+    def sign_psbt(self, psbt: bdk.Psbt) -> bdk.Psbt:
         "Returns a signed psbt. However it still needs to be finalized by  a bdk wallet"
         assert self.client
         hwi_psbt = PSBT()
@@ -382,7 +380,7 @@ class USBDevice(BaseDevice, QObject):
 
         signed_hwi_psbt = self.client.sign_tx(hwi_psbt)
 
-        return bdk.PartiallySignedTransaction(signed_hwi_psbt.serialize())
+        return bdk.Psbt(signed_hwi_psbt.serialize())
 
     def sign_message(self, message: str, bip32_path: str) -> str:
         assert self.client
