@@ -93,7 +93,9 @@ class ToolGui(QMainWindow):
         address_tab = QWidget()
         address_tab_layout = QVBoxLayout(address_tab)
         self.descriptor_text_edit = QTextEdit(address_tab)
-        self.descriptor_text_edit.setPlaceholderText(self.tr("Paste your descriptor to be signed"))
+        self.descriptor_text_edit.setPlaceholderText(
+            self.tr("Paste your address descriptor, .e.g. wpkh([fingerprint/84'/0'/0']xpub/0/0)")
+        )
         address_tab_layout.addWidget(self.descriptor_text_edit)
         self.display_address_button = SpinningButton(
             text=self.tr("Display Address"), enable_signal=self.usb.signal_end_hwi_blocker, parent=address_tab
