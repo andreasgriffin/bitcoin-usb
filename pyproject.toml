@@ -19,14 +19,14 @@ description = "Wrapper around hwi, such that one can sign bdk PSBTs directly"
 homepage = "https://github.com/andreasgriffin/bitcoin-usb"
 
 [tool.poetry.dependencies]
-python = ">=3.8.1,<3.13"
+python = ">=3.9.2,<3.13"
 bdkpython ="1.2.0"
 # HWI didnt merge the Jade Plus Fix yet, so I am using the head of HWI + the Jade Plus udev rule fix
 hwi =  { git = "https://github.com/JamieDriver/HWI.git", rev = "4d17ae6e4e9d669a30f7df0e4dbc2781d4ed531d" }  # "^3.0.0"
 pyqt6 = "^6.6.1"
 mnemonic = "^0.21"
 requests = "^2.32.3" # essential for Jade to work
-trezor = "^0.13.9"
+trezor = "^0.13.9" 
 
 
 
