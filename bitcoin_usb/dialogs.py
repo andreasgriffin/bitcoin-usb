@@ -4,6 +4,7 @@ from typing import Any, Dict, List
 
 import bdkpython as bdk
 from PyQt6.QtCore import QEventLoop, QObject, QThread, pyqtSignal
+from PyQt6.QtGui import QGuiApplication
 from PyQt6.QtWidgets import (
     QApplication,
     QDialog,
@@ -112,6 +113,18 @@ class DeviceDialog(QDialog):
 
         self.selected_device: Dict[str, Any] | None = None
         self.network = network
+
+        # ensure the dialog has its “natural” size
+        self.adjustSize()
+        # get screen center
+        if primaryScreen := QGuiApplication.primaryScreen():
+            screen_geom = primaryScreen.availableGeometry()
+            screen_center = screen_geom.center()
+
+            # move this dialog’s frame so that its center is at screen_center
+            fg = self.frameGeometry()
+            fg.moveCenter(screen_center)
+            self.move(fg.topLeft())
 
     def select_device(self, device: Dict[str, Any]):
         self.selected_device = device
