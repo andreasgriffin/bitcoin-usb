@@ -29,6 +29,7 @@
 
 import os
 import sys
+from typing import Optional
 
 from PyQt6.QtCore import QRectF, QSize, QTimer, pyqtBoundSignal
 from PyQt6.QtGui import QIcon, QPainter, QPaintEvent
@@ -115,8 +116,8 @@ class SpinningButton(QPushButton):
         self.rotation_angle = (self.rotation_angle + 10) % 360
         self.update()  # Trigger repaint
 
-    def paintEvent(self, event: QPaintEvent | None) -> None:
-        super().paintEvent(event)
+    def paintEvent(self, a0: Optional[QPaintEvent]) -> None:
+        super().paintEvent(a0)
 
         if self.timer.isActive():
             painter = QPainter(self)

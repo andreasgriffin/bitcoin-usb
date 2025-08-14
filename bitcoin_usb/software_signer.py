@@ -35,7 +35,7 @@ class SoftwareSigner(BaseDevice):
                 descriptor_public=change_descriptor, mnemonic_str=mnemonic, network=network
             ),
             network=self.network,
-            connection=bdk.Connection.new_in_memory(),
+            persister=bdk.Persister.new_in_memory(),
         )
 
     def derive(self, key_origin: str):
@@ -87,24 +87,24 @@ class SoftwareSigner(BaseDevice):
             # derived_secret = "[7c85f2b5/84'/1'/0']tpriv..../*"
             derived_secret = root_secret_key.derive(bdk.DerivationPath(spk_provider.key_origin))
             # derived_pub_str = "[7c85f2b5/84'/1'/0']tpub...."
-            derived_pub_str = strip_derivation_path(derived_secret.as_public().as_string())
+            derived_pub_str = strip_derivation_path(str(derived_secret.as_public()))
             if spk_provider.xpub in derived_pub_str:
                 # descriptor_with_secret = "wpkh([7c85f2b5/84'/1'/0']tpriv..../0/*)"
                 descriptor_with_secret = descriptor_with_secret.replace(
-                    derived_pub_str, strip_derivation_path(derived_secret.as_string())
+                    derived_pub_str, strip_derivation_path(str(derived_secret))
                 )
 
         return bdk.Descriptor(descriptor=descriptor_with_secret, network=network)
 
-    def sign_psbt(self, input_psbt: bdk.Psbt) -> bdk.Psbt | None:
+    def sign_psbt(self, psbt: bdk.Psbt) -> bdk.Psbt | None:
 
-        previous_serialized = input_psbt.serialize()
-        fully_signed = self.wallet.sign(psbt=input_psbt, sign_options=None)
+        previous_serialized = psbt.serialize()
+        fully_signed = self.wallet.sign(psbt=psbt, sign_options=None)
         if fully_signed:
-            return input_psbt
-        if input_psbt.serialize() == previous_serialized:
+            return psbt
+        if psbt.serialize() == previous_serialized:
             return None
-        return input_psbt
+        return psbt
 
     def sign_message(self, message: str, bip32_path: str) -> str:
         raise NotImplementedError("")
@@ -112,5 +112,5 @@ class SoftwareSigner(BaseDevice):
     def display_address(
         self,
         address_descriptor: str,
-    ):
-        pass
+    ) -> str:
+        raise NotImplementedError()

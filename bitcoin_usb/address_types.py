@@ -394,7 +394,9 @@ class SimplePubKeyProvider:
             xpub=pubkey_provider.pubkey,
             fingerprint=fingerprint,
             key_origin=key_origin,
-            derivation_path=pubkey_provider.deriv_path,
+            derivation_path=pubkey_provider.deriv_path
+            if pubkey_provider.deriv_path
+            else ConstDerivationPaths.receive,
         )
 
     def to_hwi_pubkey_provider(self) -> PubkeyProvider:
@@ -479,22 +481,21 @@ class DescriptorInfo:
                     f"{spk_provider.key_origin} does not match the default key origin {self.address_type.key_origin(network)} for this address type {self.address_type.name}!"
                 )
 
+        last_cls = self.address_type.hwi_descriptor_classes[-1]
         if self.address_type.is_multisig:
             assert (
-                self.address_type.hwi_descriptor_classes[-1] != MultisigDescriptor
+                last_cls != MultisigDescriptor
             )  # multi() is not suuported, and may not be added in AddressType
-            assert self.address_type.hwi_descriptor_classes[-1] == SortedMultisigDescriptor
+            assert last_cls == SortedMultisigDescriptor
             hwi_descriptor = SortedMultisigDescriptor(
                 pubkeys=[provider.to_hwi_pubkey_provider() for provider in self.spk_providers],
                 thresh=self.threshold,
             )
         else:
-            hwi_descriptor = self.address_type.hwi_descriptor_classes[-1](
-                self.spk_providers[0].to_hwi_pubkey_provider()
-            )
+            hwi_descriptor = last_cls(self.spk_providers[0].to_hwi_pubkey_provider())  # type: ignore
 
         for hwi_descriptor_class in reversed(self.address_type.hwi_descriptor_classes[:-1]):
-            hwi_descriptor = hwi_descriptor_class(hwi_descriptor)
+            hwi_descriptor = hwi_descriptor_class(hwi_descriptor)  # type: ignore
 
         return hwi_descriptor
 
