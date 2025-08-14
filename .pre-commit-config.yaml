@@ -5,7 +5,8 @@ repos:
       - id: isort
         args:
           - --profile=black  # Set the import order style (change 'google' to your preferred style)          
-        exclude: 'urtypes/__init__.py'          
+        exclude: 'urtypes/__init__.py'       
+
   - repo: https://github.com/myint/autoflake
     rev: v2.2.1  # Use the latest version of autoflake
     hooks:
@@ -15,11 +16,13 @@ repos:
           - --remove-unused-variables
           - --in-place
           - --exclude=__init__.py
+
   - repo: https://github.com/ambv/black
     rev: 22.3.0
     hooks:
     - id: black
       language_version: python3.10
+
   - repo: https://github.com/pre-commit/mirrors-mypy
     rev: v1.11.2   # Use the latest MyPy version
     hooks:
@@ -44,4 +47,18 @@ repos:
         additional_dependencies: 
           - types-requests
           - pyqt6 
-          - "bdkpython==1.2.0"
+
+
+ 
+ 
+ 
+
+  - repo: local
+    hooks:
+      - id: pyright
+        name: Pyright Type Check
+        entry: pyright
+        language: system
+        files: ^bitcoin_usb/[^/]+\.py$  
+        types: [python]
+        pass_filenames: true

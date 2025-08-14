@@ -67,7 +67,7 @@ class USBGui(QObject):
     def get_devices(self, slow_hwi_listing=False) -> List[Dict[str, Any]]:
         "Returns the found devices WITHOUT unlocking them first.  Misses the fingerprints"
         allow_emulators = False
-        devices = []
+        devices: List[Dict[str, Any]] = []
 
         try:
             if slow_hwi_listing:
