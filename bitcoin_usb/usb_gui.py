@@ -1,10 +1,14 @@
 import logging
 import platform
 import re
+import tempfile
+from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
 import bdkpython as bdk
 import hwilib.commands as hwi_commands
+from bitcoin_safe_lib.gui.qt.util import question_dialog
+from bitcoin_safe_lib.util_os import xdg_open_file
 from hwilib.devices.bitbox02 import Bitbox02Client
 from PyQt6.QtCore import QObject, pyqtSignal
 from PyQt6.QtWidgets import QMessageBox, QPushButton
@@ -329,6 +333,7 @@ class USBGui(QObject):
             msg_box.exec()
 
     def show_error_message_linux(self, text: str) -> None:
+
         # Create the text box
         msg_box = QMessageBox()
         msg_box.setIcon(QMessageBox.Icon.Critical)
@@ -366,8 +371,30 @@ class USBGui(QObject):
         from bitcoin_usb.udevwrapper import UDevWrapper
 
         UDevWrapper().linux_cmd_install_udev_as_sudo()
-        get_message_box(
-            translate("bitcoin_usb", "Please restart your computer for the changes to take effect."),
-            QMessageBox.Icon.Information,
-            translate("bitcoin_usb", "Restart computer"),
-        ).exec()
+        res = question_dialog(
+            text=self.tr(
+                "Please restart your computer for the changes to take effect.",
+            ),
+            title=self.tr("Restart computer"),
+            true_button=QMessageBox.StandardButton.Ok,
+            false_button=self.tr("Manually install udev rules"),
+        )
+        if res is None:
+            return
+        elif res:
+            return
+        else:
+            script_content = UDevWrapper()._create_udev_script()
+
+            message = (
+                self.tr("Please copy and paste the following script in a terminal to install the udev rules:")
+                + "\n\n\n"
+                + script_content
+            )
+
+            # Create a temporary file with a message to the user
+            with tempfile.NamedTemporaryFile(mode="w+", delete=False, suffix=".txt") as temp_file:
+                temp_file.write(message)
+                temp_file_path = temp_file.name
+
+            xdg_open_file(Path(temp_file_path), is_text_file=True)

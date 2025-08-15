@@ -87,7 +87,7 @@ class UDevWrapper:
                 shutil.copy(file_path, target_dir)
                 print(f"Copied {file_path} to {target_dir}")
 
-    def linux_cmd_install_udev_as_sudo(self, sleep=3):
+    def _create_udev_script(self, sleep=3) -> str:
         temp_dir = Path(tempfile.mkdtemp())
 
         filename_install_script = "install_udev.sh"
@@ -99,6 +99,10 @@ class UDevWrapper:
                         sudo sh {(temp_dir/filename_install_script).absolute()} 
                         sleep {sleep}
                         """
+        return script_content
+
+    def linux_cmd_install_udev_as_sudo(self, sleep=3):
+        script_content = self._create_udev_script(sleep=sleep)
         self.linux_execute_sudo_script(script_content)
 
 
