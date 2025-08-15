@@ -98,10 +98,23 @@ class USBGui(QObject):
         devices = self.get_devices(slow_hwi_listing=slow_hwi_listing)
 
         if not devices:
-            get_message_box(
-                translate("bitcoin_usb", "No USB devices found"),
-                title=translate("bitcoin_usb", "USB Devices"),
-            ).exec()
+            if platform.system() == "Linux":
+                if (
+                    question_dialog(
+                        text=self.tr("No USB devices found. It could be due to missing udev rules."),
+                        title=self.tr("USB Devices"),
+                        false_button="Install udev rules",
+                        true_button=QMessageBox.StandardButton.Ok,
+                    )
+                    is False
+                ):
+                    self.linux_cmd_install_udev_as_sudo()
+            else:
+                get_message_box(
+                    translate("bitcoin_usb", "No USB devices found"),
+                    title=translate("bitcoin_usb", "USB Devices"),
+                ).exec()
+
             self.signal_end_hwi_blocker.emit()
             return None
         if len(devices) == 1 and self.autoselect_if_1_device:
@@ -111,23 +124,10 @@ class USBGui(QObject):
             if dialog.exec():
                 return dialog.get_selected_device()
             else:
-
-                if platform.system() == "Linux":
-                    if (
-                        question_dialog(
-                            text=self.tr("No device selected. It could be due to missing udev rules."),
-                            title=self.tr("USB Devices"),
-                            false_button="Install udev rules",
-                            true_button=QMessageBox.StandardButton.Ok,
-                        )
-                        is False
-                    ):
-                        self.linux_cmd_install_udev_as_sudo()
-                else:
-                    get_message_box(
-                        self.tr("No device selected"),
-                        title=self.tr("USB Devices"),
-                    ).exec()
+                get_message_box(
+                    self.tr("No device selected"),
+                    title=self.tr("USB Devices"),
+                ).exec()
                 self.signal_end_hwi_blocker.emit()
         return None
 
