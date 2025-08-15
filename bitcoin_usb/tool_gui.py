@@ -1,3 +1,4 @@
+import platform
 from typing import Optional
 
 import bdkpython as bdk
@@ -7,6 +8,7 @@ from PyQt6.QtWidgets import (
     QLineEdit,
     QMainWindow,
     QMessageBox,
+    QPushButton,
     QTabWidget,
     QTextEdit,
     QVBoxLayout,
@@ -125,6 +127,15 @@ class ToolGui(QMainWindow):
         show_seed_tab_layout.addWidget(self.show_seed_button)
         tab_widget.addTab(show_seed_tab, self.tr("Show Seed"))
 
+        # Tab 7: udev
+        if platform.system() == "Linux":
+            udev_tab = QWidget()
+            udev_tab_layout = QVBoxLayout(udev_tab)
+            self.udev_button = QPushButton(text=self.tr("Install udev rules"), parent=udev_tab)
+            self.udev_button.clicked.connect(self.install_udev)
+            udev_tab_layout.addWidget(self.udev_button)
+            tab_widget.addTab(udev_tab, ("udev"))
+
         # Initialize the network selection
 
         self.combo_network.currentIndexChanged.connect(
@@ -135,6 +146,9 @@ class ToolGui(QMainWindow):
         self.shortcut_close.activated.connect(self.close)
         self.shortcut_close2 = QShortcut(QKeySequence("ESC"), self)
         self.shortcut_close2.activated.connect(self.close)
+
+    def install_udev(self):
+        self.usb.linux_cmd_install_udev_as_sudo()
 
     def wipe_device(self) -> Optional[bool]:
         return self.usb.wipe_device()
