@@ -1,3 +1,4 @@
+import platform
 from typing import Optional
 
 import bdkpython as bdk
@@ -6,6 +7,8 @@ from PyQt6.QtWidgets import (
     QComboBox,
     QLineEdit,
     QMainWindow,
+    QMessageBox,
+    QPushButton,
     QTabWidget,
     QTextEdit,
     QVBoxLayout,
@@ -124,6 +127,15 @@ class ToolGui(QMainWindow):
         show_seed_tab_layout.addWidget(self.show_seed_button)
         tab_widget.addTab(show_seed_tab, self.tr("Show Seed"))
 
+        # Tab 7: udev
+        if platform.system() == "Linux":
+            udev_tab = QWidget()
+            udev_tab_layout = QVBoxLayout(udev_tab)
+            self.udev_button = QPushButton(text=self.tr("Install udev rules"), parent=udev_tab)
+            self.udev_button.clicked.connect(self.install_udev)
+            udev_tab_layout.addWidget(self.udev_button)
+            tab_widget.addTab(udev_tab, ("udev"))
+
         # Initialize the network selection
 
         self.combo_network.currentIndexChanged.connect(
@@ -134,6 +146,9 @@ class ToolGui(QMainWindow):
         self.shortcut_close.activated.connect(self.close)
         self.shortcut_close2 = QShortcut(QKeySequence("ESC"), self)
         self.shortcut_close2.activated.connect(self.close)
+
+    def install_udev(self):
+        self.usb.linux_cmd_install_udev_as_sudo()
 
     def wipe_device(self) -> Optional[bool]:
         return self.usb.wipe_device()
@@ -152,11 +167,15 @@ class ToolGui(QMainWindow):
             self.message_text_edit.setText(signed_message)
 
     def sign(self) -> None:
-        psbt = bdk.Psbt(self.psbt_text_edit.toPlainText())
-        self.psbt_text_edit.setText("")
-        signed_psbt = self.usb.sign(psbt)
-        if signed_psbt:
-            self.psbt_text_edit.setText(signed_psbt.serialize())
+        try:
+            psbt = bdk.Psbt(self.psbt_text_edit.toPlainText())
+            self.psbt_text_edit.setText("")
+            signed_psbt = self.usb.sign(psbt)
+            if signed_psbt:
+                self.psbt_text_edit.setText(signed_psbt.serialize())
+        except Exception as e:
+            QMessageBox.warning(None, "Error", str(e))
+        self.psbt_button.enable_button()
 
     def on_button_unlock_clicked(self) -> None:
         self.usb.get_fingerprint_and_xpubs(slow_hwi_listing=True)
