@@ -6,6 +6,7 @@ from PyQt6.QtWidgets import (
     QComboBox,
     QLineEdit,
     QMainWindow,
+    QMessageBox,
     QTabWidget,
     QTextEdit,
     QVBoxLayout,
@@ -152,11 +153,15 @@ class ToolGui(QMainWindow):
             self.message_text_edit.setText(signed_message)
 
     def sign(self) -> None:
-        psbt = bdk.Psbt(self.psbt_text_edit.toPlainText())
-        self.psbt_text_edit.setText("")
-        signed_psbt = self.usb.sign(psbt)
-        if signed_psbt:
-            self.psbt_text_edit.setText(signed_psbt.serialize())
+        try:
+            psbt = bdk.Psbt(self.psbt_text_edit.toPlainText())
+            self.psbt_text_edit.setText("")
+            signed_psbt = self.usb.sign(psbt)
+            if signed_psbt:
+                self.psbt_text_edit.setText(signed_psbt.serialize())
+        except Exception as e:
+            QMessageBox.warning(None, "Error", str(e))
+        self.psbt_button.enable_button()
 
     def on_button_unlock_clicked(self) -> None:
         self.usb.get_fingerprint_and_xpubs(slow_hwi_listing=True)

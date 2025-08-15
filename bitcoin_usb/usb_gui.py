@@ -111,10 +111,23 @@ class USBGui(QObject):
             if dialog.exec():
                 return dialog.get_selected_device()
             else:
-                get_message_box(
-                    translate("bitcoin_usb", "No device selected"),
-                    title=translate("bitcoin_usb", "USB Devices"),
-                ).exec()
+
+                if platform.system() == "Linux":
+                    if (
+                        question_dialog(
+                            text=self.tr("No device selected. It could be due to missing udev rules."),
+                            title=self.tr("USB Devices"),
+                            false_button="Install udev rules",
+                            true_button=QMessageBox.StandardButton.Ok,
+                        )
+                        is False
+                    ):
+                        self.linux_cmd_install_udev_as_sudo()
+                else:
+                    get_message_box(
+                        self.tr("No device selected"),
+                        title=self.tr("USB Devices"),
+                    ).exec()
                 self.signal_end_hwi_blocker.emit()
         return None
 
@@ -321,9 +334,7 @@ class USBGui(QObject):
 
     def show_error_message(self, text: str) -> None:
 
-        os_name = platform.system()
-
-        if os_name == "Linux":
+        if platform.system() == "Linux":
             self.show_error_message_linux(text)
         else:
             msg_box = get_message_box(
