@@ -569,7 +569,7 @@ name = "hwi"
 version = "3.1.0"
 description = "A library for working with Bitcoin hardware wallets"
 optional = false
-python-versions = "^3.8,<3.13"
+python-versions = "^3.9,<3.13"
 groups = ["main"]
 files = []
 develop = false
@@ -588,13 +588,13 @@ semver = "^3.0.1"
 typing-extensions = "^4.4"
 
 [package.extras]
-qt = ["pyside2 (>=5.14.0,<6.0.0)"]
+qt = ["pyside2 (>=5.14.0,<6.0.0) ; python_version < \"3.10\""]
 
 [package.source]
 type = "git"
-url = "https://github.com/JamieDriver/HWI.git"
-reference = "4d17ae6e4e9d669a30f7df0e4dbc2781d4ed531d"
-resolved_reference = "4d17ae6e4e9d669a30f7df0e4dbc2781d4ed531d"
+url = "https://github.com/bitcoin-core/HWI.git"
+reference = "4e342db25d58354cf838734173d2bf195cda32f9"
+resolved_reference = "4e342db25d58354cf838734173d2bf195cda32f9"
 
 [[package]]
 name = "idna"
@@ -1135,4 +1135,4 @@ zstd = ["zstandard (>=0.18.0)"]
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.10,<3.13"
-content-hash = "036c089094052632a81046799c31501e5bd0ea9343d60ccf613694b8e1861a18"
+content-hash = "2bd2c98c4cd7ac2b0a2fe78210fe72dc936058b9b16219a5772ff7d971fbbdf2"

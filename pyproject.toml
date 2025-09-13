@@ -11,7 +11,7 @@ disable_error_code = "assignment"
 
 [tool.poetry]
 name = "bitcoin-usb"
-version = "1.0.1"
+version = "1.0.2"
 authors = ["andreasgriffin <andreasgriffin@proton.me>"]
 license = "GPL-3.0"
 readme = "README.md"
@@ -22,7 +22,7 @@ homepage = "https://github.com/andreasgriffin/bitcoin-usb"
 python = ">=3.10,<3.13"
 bdkpython ="1.2.0"
 # HWI didnt merge the Jade Plus Fix yet, so I am using the head of HWI + the Jade Plus udev rule fix
-hwi =  { git = "https://github.com/JamieDriver/HWI.git", rev = "4d17ae6e4e9d669a30f7df0e4dbc2781d4ed531d" }  # "^3.0.0"
+hwi =  { git = "https://github.com/bitcoin-core/HWI.git", branch = "master" }  # "^3.0.0"
 pyqt6 = "^6.6.1"
 mnemonic = "^0.21"
 requests = "^2.32.3" # essential for Jade to work
