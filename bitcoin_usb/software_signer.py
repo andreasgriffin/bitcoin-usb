@@ -1,5 +1,4 @@
 import logging
-from typing import Dict
 
 import bdkpython as bdk
 from hwilib.descriptor import parse_descriptor
@@ -29,10 +28,14 @@ class SoftwareSigner(BaseDevice):
 
         self.wallet = bdk.Wallet(
             descriptor=self._bdk_descriptor_with_secrets(
-                descriptor_public=receive_descriptor, mnemonic_str=mnemonic, network=network
+                descriptor_public=receive_descriptor,
+                mnemonic_str=mnemonic,
+                network=network,
             ),
             change_descriptor=self._bdk_descriptor_with_secrets(
-                descriptor_public=change_descriptor, mnemonic_str=mnemonic, network=network
+                descriptor_public=change_descriptor,
+                mnemonic_str=mnemonic,
+                network=network,
             ),
             network=self.network,
             persister=bdk.Persister.new_in_memory(),
@@ -48,7 +51,7 @@ class SoftwareSigner(BaseDevice):
         xpub, fingerprint = derive(self.mnemonic, address_type.key_origin(self.network), self.network)
         return fingerprint
 
-    def get_xpubs(self) -> Dict[AddressType, str]:
+    def get_xpubs(self) -> dict[AddressType, str]:
         xpubs = {}
         for address_type in get_all_address_types():
             xpub, fingerprint = derive(self.mnemonic, address_type.key_origin(self.network), self.network)
@@ -97,7 +100,6 @@ class SoftwareSigner(BaseDevice):
         return bdk.Descriptor(descriptor=descriptor_with_secret, network=network)
 
     def sign_psbt(self, psbt: bdk.Psbt) -> bdk.Psbt | None:
-
         previous_serialized = psbt.serialize()
         fully_signed = self.wallet.sign(psbt=psbt, sign_options=None)
         if fully_signed:

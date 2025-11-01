@@ -395,7 +395,6 @@ def test_key_origin_identical_up_to_account_nonstandard():
 
 
 def test_valid_xpub():
-
     valid_xpub = "   tpubDCPkYWRWsTRZji1938hvWzdDsfQ39aasHz47s3htaKyYSHGdZBoNynBzwQsFS4xn4X4basMr1qL3DcPbjhcVNCzLzGhLoZixu2CAke9Q3hK   "
     provider = SimplePubKeyProvider(valid_xpub, "abcdef01", "m/84h/1h/0h", "/0/*")
     # Expect that the xpub is stripped and returned in canonical form.

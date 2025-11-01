@@ -1,6 +1,7 @@
 import sys
 import time
-from typing import Any, Callable, Dict, Generic, List, Optional, TypeVar
+from collections.abc import Callable
+from typing import Any, Generic, TypeVar
 
 import bdkpython as bdk
 from PyQt6.QtCore import QEventLoop, QObject, QThread, pyqtSignal
@@ -99,7 +100,7 @@ class ThreadedWaitingDialog(QDialog, Generic[T]):
             raise self.exception  # Re-raise the exception after closing the dialog
         return self.func_result
 
-    def closeEvent(self, a0: Optional[QCloseEvent]) -> None:
+    def closeEvent(self, a0: QCloseEvent | None) -> None:
         if self._thread.isRunning():
             self._thread.quit()
             self._thread.wait()
@@ -107,7 +108,7 @@ class ThreadedWaitingDialog(QDialog, Generic[T]):
 
 
 class DeviceDialog(QDialog):
-    def __init__(self, parent, devices: List[Dict[str, Any]], network: bdk.Network):
+    def __init__(self, parent, devices: list[dict[str, Any]], network: bdk.Network):
         super().__init__(parent)
         self.setWindowTitle(self.tr("Select the detected device"))
         self._layout = QVBoxLayout(self)
@@ -119,7 +120,7 @@ class DeviceDialog(QDialog):
             button.clicked.connect(lambda *args, d=device: self.select_device(d))
             self._layout.addWidget(button)
 
-        self.selected_device: Dict[str, Any] | None = None
+        self.selected_device: dict[str, Any] | None = None
         self.network = network
 
         # ensure the dialog has its “natural” size
@@ -134,11 +135,11 @@ class DeviceDialog(QDialog):
             fg.moveCenter(screen_center)
             self.move(fg.topLeft())
 
-    def select_device(self, device: Dict[str, Any]):
+    def select_device(self, device: dict[str, Any]):
         self.selected_device = device
         self.accept()
 
-    def get_selected_device(self) -> Dict[str, Any] | None:
+    def get_selected_device(self) -> dict[str, Any] | None:
         return self.selected_device
 
 

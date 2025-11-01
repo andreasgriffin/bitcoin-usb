@@ -1,12 +1,11 @@
 import logging
 import subprocess
 import sys
-from typing import List
 
 logger = logging.getLogger(__name__)
 
 
-def run_script(script_name, args: List[str]):
+def run_script(script_name, args: list[str]):
     # Run the script using the same Python interpreter that's running this script
     process = subprocess.Popen(
         [sys.executable, script_name] + args,

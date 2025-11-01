@@ -4,7 +4,6 @@ import subprocess
 import sys
 import tempfile
 from pathlib import Path
-from typing import List
 
 from hwilib.udevinstaller import _resource_path
 
@@ -12,7 +11,7 @@ from bitcoin_usb.i18n import translate
 
 
 class UDevWrapper:
-    def list_rule_files(self) -> List[Path]:
+    def list_rule_files(self) -> list[Path]:
         """
         Searches for a file in the specified directory that matches the filename exactly.
         Returns the Path object for the file if found, otherwise None.
@@ -36,13 +35,19 @@ class UDevWrapper:
         return Path(_resource_path(str(source_dir))) if absolute else source_dir
 
     def linux_execute_sudo_script(self, script_content: str):
-        terminals = ["konsole", "gnome-terminal", "xterm", "lxterminal", "xfce4-terminal"]
+        terminals = [
+            "konsole",
+            "gnome-terminal",
+            "xterm",
+            "lxterminal",
+            "xfce4-terminal",
+        ]
 
         # Create a temporary file to write the shell script
         with tempfile.NamedTemporaryFile(delete=False, mode="w", suffix=".sh") as temp_script:
             # Write commands to temp file
             temp_script.write("#!/bin/bash\n")
-            temp_script.write(f"""echo '{translate("bitcoin_usb","Executing the script")}:'\n""")
+            temp_script.write(f"""echo '{translate("bitcoin_usb", "Executing the script")}:'\n""")
             temp_script.write("echo '''\n" + script_content + "\n'''\n")
             temp_script.write(script_content)  # Add actual commands to be executed after confirmation
             temp_script_path = temp_script.name
@@ -65,7 +70,10 @@ class UDevWrapper:
                     subprocess.run(cmd)
                     break
             if not found_terminal:
-                print(translate("bitcoin_usb", "No suitable terminal emulator found."), file=sys.stderr)
+                print(
+                    translate("bitcoin_usb", "No suitable terminal emulator found."),
+                    file=sys.stderr,
+                )
                 return False
         finally:
             # Optionally remove the script after execution
@@ -74,7 +82,7 @@ class UDevWrapper:
         return True
 
     @staticmethod
-    def copy_files(full_filenames: List[Path], target_dir: Path) -> None:
+    def copy_files(full_filenames: list[Path], target_dir: Path) -> None:
         """
         Copy a list of files to a target directory.
 
@@ -96,7 +104,7 @@ class UDevWrapper:
 
         script_content = f"""
                         #!/bin/bash
-                        sudo sh {(temp_dir/filename_install_script).absolute()} 
+                        sudo sh {(temp_dir / filename_install_script).absolute()} 
                         sleep {sleep}
                         """
         return script_content

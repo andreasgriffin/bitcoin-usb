@@ -1,5 +1,5 @@
 import logging
-from typing import Callable, Dict, List, Optional, Sequence, Type
+from collections.abc import Callable, Sequence
 
 import bdkpython as bdk
 from hwilib.common import AddressType as HWIAddressType
@@ -28,7 +28,7 @@ logger = logging.getLogger(__name__)
 
 
 class SortedMultisigDescriptor(MultisigDescriptor):
-    def __init__(self, pubkeys: List[PubkeyProvider], thresh: int) -> None:
+    def __init__(self, pubkeys: list[PubkeyProvider], thresh: int) -> None:
         super().__init__(pubkeys, thresh, True)
 
     @classmethod
@@ -57,7 +57,7 @@ class AddressType:
         short_name: str,
         name: str,
         is_multisig: bool,
-        hwi_descriptor_classes: Sequence[Type[Descriptor]],
+        hwi_descriptor_classes: Sequence[type[Descriptor]],
         key_origin: Callable[[bdk.Network], str],
         bdk_descriptor_secret: Callable[
             [bdk.DescriptorSecretKey, bdk.KeychainKind, bdk.Network], bdk.Descriptor
@@ -66,7 +66,8 @@ class AddressType:
         info_url: str | None = None,
         description: str | None = None,
         bdk_descriptor: Callable[
-            [bdk.DescriptorPublicKey, str, bdk.KeychainKind, bdk.Network], bdk.Descriptor
+            [bdk.DescriptorPublicKey, str, bdk.KeychainKind, bdk.Network],
+            bdk.Descriptor,
         ]
         | None = None,
     ) -> None:
@@ -108,7 +109,7 @@ class AddressTypes:
         "p2pkh",
         "Single Sig (Legacy/p2pkh)",
         is_multisig=False,
-        key_origin=lambda network: f"m/44h/{0 if network==bdk.Network.BITCOIN else 1}h/0h",
+        key_origin=lambda network: f"m/44h/{0 if network == bdk.Network.BITCOIN else 1}h/0h",
         bdk_descriptor=bdk.Descriptor.new_bip44_public,
         bdk_descriptor_secret=bdk.Descriptor.new_bip44,
         info_url="https://learnmeabitcoin.com/technical/derivation-paths",
@@ -119,7 +120,7 @@ class AddressTypes:
         "p2sh-p2wpkh",
         "Single Sig (Nested/p2sh-p2wpkh)",
         is_multisig=False,
-        key_origin=lambda network: f"m/49h/{0 if network==bdk.Network.BITCOIN else 1}h/0h",
+        key_origin=lambda network: f"m/49h/{0 if network == bdk.Network.BITCOIN else 1}h/0h",
         bdk_descriptor=bdk.Descriptor.new_bip49_public,
         bdk_descriptor_secret=bdk.Descriptor.new_bip49,
         info_url="https://learnmeabitcoin.com/technical/derivation-paths",
@@ -130,7 +131,7 @@ class AddressTypes:
         "p2wpkh",
         "Single Sig (SegWit/p2wpkh)",
         is_multisig=False,
-        key_origin=lambda network: f"m/84h/{0 if network==bdk.Network.BITCOIN else 1}h/0h",
+        key_origin=lambda network: f"m/84h/{0 if network == bdk.Network.BITCOIN else 1}h/0h",
         bdk_descriptor=bdk.Descriptor.new_bip84_public,
         bdk_descriptor_secret=bdk.Descriptor.new_bip84,
         info_url="https://learnmeabitcoin.com/technical/derivation-paths",
@@ -141,7 +142,7 @@ class AddressTypes:
         "p2tr",
         "Single Sig (Taproot/p2tr)",
         is_multisig=False,
-        key_origin=lambda network: f"m/86h/{0 if network==bdk.Network.BITCOIN else 1}h/0h",
+        key_origin=lambda network: f"m/86h/{0 if network == bdk.Network.BITCOIN else 1}h/0h",
         bdk_descriptor=bdk.Descriptor.new_bip86_public,
         bdk_descriptor_secret=bdk.Descriptor.new_bip86,
         info_url="https://github.com/bitcoin/bips/blob/master/bip-0386.mediawiki",
@@ -152,7 +153,7 @@ class AddressTypes:
         "p2sh-p2wsh",
         "Multi Sig (Nested/p2sh-p2wsh)",
         is_multisig=True,
-        key_origin=lambda network: f"m/48h/{0 if network==bdk.Network.BITCOIN else 1}h/0h/1h",
+        key_origin=lambda network: f"m/48h/{0 if network == bdk.Network.BITCOIN else 1}h/0h/1h",
         bdk_descriptor_secret=None,
         info_url="https://github.com/bitcoin/bips/blob/master/bip-0048.mediawiki",
         description="Nested (multi sig) addresses that look like 3addresses",
@@ -162,7 +163,7 @@ class AddressTypes:
         "p2wsh",
         "Multi Sig (SegWit/p2wsh)",
         is_multisig=True,
-        key_origin=lambda network: f"m/48h/{0 if network==bdk.Network.BITCOIN else 1}h/0h/2h",
+        key_origin=lambda network: f"m/48h/{0 if network == bdk.Network.BITCOIN else 1}h/0h/2h",
         bdk_descriptor_secret=None,
         info_url="https://github.com/bitcoin/bips/blob/master/bip-0048.mediawiki",
         description="SegWit (multi sig) addresses that look like bc1addresses",
@@ -170,15 +171,15 @@ class AddressTypes:
     )
 
 
-def get_address_type_dicts() -> Dict[str, AddressType]:
+def get_address_type_dicts() -> dict[str, AddressType]:
     return {k: v for k, v in AddressTypes.__dict__.items() if (not k.startswith("_"))}
 
 
-def get_all_address_types() -> List[AddressType]:
+def get_all_address_types() -> list[AddressType]:
     return list(get_address_type_dicts().values())
 
 
-def get_address_types(is_multisig: bool) -> List[AddressType]:
+def get_address_types(is_multisig: bool) -> list[AddressType]:
     return [a for a in get_all_address_types() if a.is_multisig == is_multisig]
 
 
@@ -258,16 +259,16 @@ class SimplePubKeyProvider:
         return cls.key_origin_indexes_to_str(indexes)
 
     @classmethod
-    def robust_parse_path(cls, key_origin: str) -> Optional[List[int]]:
+    def robust_parse_path(cls, key_origin: str) -> list[int] | None:
         # normalize the input and ensure it is valid
         try:
             indexes = parse_path(key_origin)
-        except:
+        except Exception:
             return None
         return indexes
 
     @classmethod
-    def get_network_index(cls, key_origin: str) -> Optional[int]:
+    def get_network_index(cls, key_origin: str) -> int | None:
         # normalize the input and ensure it is valid
         indexes = cls.robust_parse_path(key_origin)
         if not indexes:
@@ -286,7 +287,7 @@ class SimplePubKeyProvider:
         return index_network & ~HARDENED_FLAG
 
     @classmethod
-    def get_account_index(cls, key_origin: str) -> Optional[int]:
+    def get_account_index(cls, key_origin: str) -> int | None:
         # normalize the input and ensure it is valid
         indexes = cls.robust_parse_path(key_origin)
         if not indexes:
@@ -305,7 +306,7 @@ class SimplePubKeyProvider:
         return index_network & ~HARDENED_FLAG
 
     @classmethod
-    def key_origin_indexes_to_str(cls, indexes: List[int]) -> str:
+    def key_origin_indexes_to_str(cls, indexes: list[int]) -> str:
         def _path_string(self, hardened_char: str = "h") -> str:
             s = ""
             for i in indexes:
@@ -374,9 +375,10 @@ class SimplePubKeyProvider:
         else:
             # https://learnmeabitcoin.com/technical/derivation-paths
             raise ValueError(
-                translate("bitcoin_usb", "Unknown network/coin type {network_str} in {key_origin}").format(
-                    network_str=network_str, key_origin=self.key_origin
-                )
+                translate(
+                    "bitcoin_usb",
+                    "Unknown network/coin type {network_str} in {key_origin}",
+                ).format(network_str=network_str, key_origin=self.key_origin)
             )
 
     @classmethod
@@ -400,7 +402,6 @@ class SimplePubKeyProvider:
         )
 
     def to_hwi_pubkey_provider(self) -> PubkeyProvider:
-
         provider = PubkeyProvider(
             origin=KeyOriginInfo.from_string(self.key_origin.replace("m", f"{self.fingerprint}")),
             pubkey=self.xpub,
@@ -415,7 +416,7 @@ class SimplePubKeyProvider:
         return f"{self.key_origin}/{0 if kind == bdk.KeychainKind.EXTERNAL else 1}/{index}"
 
 
-def _get_descriptor_instances(descriptor: Descriptor) -> List[Descriptor]:
+def _get_descriptor_instances(descriptor: Descriptor) -> list[Descriptor]:
     """
     Returns the linear chain of chained descriptors, and converts MultisigDescriptor into SortedMultisigDescriptor if possible.
     Multiple subdescriptors return an error
@@ -446,11 +447,12 @@ def _get_descriptor_instances(descriptor: Descriptor) -> List[Descriptor]:
 
 
 def _find_matching_address_type(
-    descriptor_tuple: List[Descriptor], address_types: List[AddressType]
-) -> Optional[AddressType]:
+    descriptor_tuple: list[Descriptor], address_types: list[AddressType]
+) -> AddressType | None:
     for address_type in address_types:
         if len(descriptor_tuple) == len(address_type.hwi_descriptor_classes) and all(
-            isinstance(i, c) for i, c in zip(descriptor_tuple, address_type.hwi_descriptor_classes)
+            isinstance(i, c)
+            for i, c in zip(descriptor_tuple, address_type.hwi_descriptor_classes, strict=False)
         ):
             return address_type
     return None
@@ -460,11 +462,11 @@ class DescriptorInfo:
     def __init__(
         self,
         address_type: AddressType,
-        spk_providers: List[SimplePubKeyProvider],
+        spk_providers: list[SimplePubKeyProvider],
         threshold=1,
     ) -> None:
         self.address_type: AddressType = address_type
-        self.spk_providers: List[SimplePubKeyProvider] = spk_providers
+        self.spk_providers: list[SimplePubKeyProvider] = spk_providers
         self.threshold: int = threshold
 
         if not self.address_type.is_multisig:

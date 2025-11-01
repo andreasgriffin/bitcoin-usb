@@ -1,8 +1,9 @@
 import logging
 import threading
 from abc import abstractmethod
+from collections.abc import Callable
 from pathlib import Path
-from typing import Any, Callable, Dict, Optional
+from typing import Any
 
 import bdkpython as bdk
 import hwilib.commands as hwi_commands
@@ -40,10 +41,10 @@ logger = logging.getLogger(__name__)
 
 def create_custom_message_box(
     icon: QMessageBox.Icon,
-    title: Optional[str],
-    text: Optional[str],
+    title: str | None,
+    text: str | None,
     buttons: QMessageBox.StandardButton = QMessageBox.StandardButton.Ok,
-    parent: Optional[QWidget] = None,
+    parent: QWidget | None = None,
     flags: Qt.WindowType = Qt.WindowType.Widget,
 ):
     msg_box = QMessageBox(parent)
@@ -57,7 +58,9 @@ def create_custom_message_box(
 
 
 def question_dialog(
-    text="", title="Question", buttons=QMessageBox.StandardButton.Cancel | QMessageBox.StandardButton.Yes
+    text="",
+    title="Question",
+    buttons=QMessageBox.StandardButton.Cancel | QMessageBox.StandardButton.Yes,
 ) -> bool:
     msg_box = QMessageBox()
     msg_box.setWindowTitle(title)
@@ -199,7 +202,7 @@ class BaseDevice:
         pass
 
     @abstractmethod
-    def get_xpubs(self) -> Dict[AddressType, str]:
+    def get_xpubs(self) -> dict[AddressType, str]:
         pass
 
     @abstractmethod
@@ -228,7 +231,8 @@ class DialogNoiseConfig(CLINoiseConfig):
         )
         self.threaded_dialog.add_text(
             translate(
-                "usb", "Please compare and confirm the pairing code on your BitBox02:\n\n{code}"
+                "usb",
+                "Please compare and confirm the pairing code on your BitBox02:\n\n{code}",
             ).format(code=code)
         )
         result = self.threaded_dialog.get_result()
@@ -248,13 +252,18 @@ class DialogNoiseConfig(CLINoiseConfig):
 
 
 class USBDevice(BaseDevice, QObject):
-    def __init__(self, selected_device: Dict[str, Any], network: bdk.Network, initalization_label: str = ""):
+    def __init__(
+        self,
+        selected_device: dict[str, Any],
+        network: bdk.Network,
+        initalization_label: str = "",
+    ):
         QObject.__init__(self)
         BaseDevice.__init__(self, network=network)
         self.initalization_label = initalization_label
         self.selected_device = selected_device
         self.lock = threading.Lock()
-        self.client: Optional[HardwareWalletClient] = None
+        self.client: HardwareWalletClient | None = None
 
     @staticmethod
     def is_bitbox02_initialized(client):
@@ -272,22 +281,23 @@ class USBDevice(BaseDevice, QObject):
             return bb02.device_info()["initialized"]
 
     @classmethod
-    def write_down_seed(cls, client: Bitbox02Client) -> Optional[bool]:
+    def write_down_seed(cls, client: Bitbox02Client) -> bool | None:
         if not isinstance(client, Bitbox02Client):
             return None
 
         try:
             return client.backup_device()
-        except:
+        except Exception:
             # the user canceled the backing up, so ask again
             return False
 
     @classmethod
-    def write_down_seed_ask_until_success(cls, client: Bitbox02Client) -> Optional[bool]:
+    def write_down_seed_ask_until_success(cls, client: Bitbox02Client) -> bool | None:
         if not isinstance(client, Bitbox02Client):
             return None
         while question_dialog(
-            "Do you want to show the mnemonic seed to back it up on paper?", title="Show Seed?"
+            "Do you want to show the mnemonic seed to back it up on paper?",
+            title="Show Seed?",
         ):
             success = cls.write_down_seed(client)
             if success:
@@ -363,7 +373,7 @@ class USBDevice(BaseDevice, QObject):
         assert self.client
         return self.client.get_master_fingerprint().hex()
 
-    def get_xpubs(self) -> Dict[AddressType, str]:
+    def get_xpubs(self) -> dict[AddressType, str]:
         xpubs = {}
         for address_type in get_all_address_types():
             xpubs[address_type] = self.get_xpub(address_type.key_origin(self.network))

@@ -1,5 +1,4 @@
 import platform
-from typing import Optional
 
 import bdkpython as bdk
 from PyQt6.QtGui import QKeySequence, QShortcut
@@ -43,7 +42,9 @@ class ToolGui(QMainWindow):
         unlock_tab = QWidget()
         unlock_layout = QVBoxLayout(unlock_tab)
         button = SpinningButton(
-            text=self.tr("Unlock Devices"), enable_signal=self.usb.signal_end_hwi_blocker, parent=unlock_tab
+            text=self.tr("Unlock Devices"),
+            enable_signal=self.usb.signal_end_hwi_blocker,
+            parent=unlock_tab,
         )
         button.clicked.connect(self.on_button_unlock_clicked)
         unlock_layout.addWidget(button)
@@ -53,7 +54,9 @@ class ToolGui(QMainWindow):
         xpubs_tab = QWidget()
         xpubs_layout = QVBoxLayout(xpubs_tab)
         self.button = SpinningButton(
-            text=self.tr("Get xpubs"), enable_signal=self.usb.signal_end_hwi_blocker, parent=xpubs_tab
+            text=self.tr("Get xpubs"),
+            enable_signal=self.usb.signal_end_hwi_blocker,
+            parent=xpubs_tab,
         )
         self.button.clicked.connect(self.on_button_xpubs_clicked)
         xpubs_layout.addWidget(self.button)
@@ -69,7 +72,9 @@ class ToolGui(QMainWindow):
         self.psbt_text_edit.setPlaceholderText(self.tr("Paste your PSBT in here"))
         psbt_layout.addWidget(self.psbt_text_edit)
         self.psbt_button = SpinningButton(
-            text=self.tr("Sign PSBT"), enable_signal=self.usb.signal_end_hwi_blocker, parent=psbt_tab
+            text=self.tr("Sign PSBT"),
+            enable_signal=self.usb.signal_end_hwi_blocker,
+            parent=psbt_tab,
         )
         self.psbt_button.clicked.connect(self.sign)
         psbt_layout.addWidget(self.psbt_button)
@@ -86,7 +91,9 @@ class ToolGui(QMainWindow):
         self.message_address_index_line_edit.setPlaceholderText(self.tr("Address index"))
         message_layout.addWidget(self.message_address_index_line_edit)
         self.sign_message_button = SpinningButton(
-            text=self.tr("Sign Message"), enable_signal=self.usb.signal_end_hwi_blocker, parent=message_tab
+            text=self.tr("Sign Message"),
+            enable_signal=self.usb.signal_end_hwi_blocker,
+            parent=message_tab,
         )
         self.sign_message_button.clicked.connect(self.sign_message)
         message_layout.addWidget(self.sign_message_button)
@@ -101,7 +108,9 @@ class ToolGui(QMainWindow):
         )
         address_tab_layout.addWidget(self.descriptor_text_edit)
         self.display_address_button = SpinningButton(
-            text=self.tr("Display Address"), enable_signal=self.usb.signal_end_hwi_blocker, parent=address_tab
+            text=self.tr("Display Address"),
+            enable_signal=self.usb.signal_end_hwi_blocker,
+            parent=address_tab,
         )
         self.display_address_button.clicked.connect(self.display_address)
         address_tab_layout.addWidget(self.display_address_button)
@@ -111,7 +120,9 @@ class ToolGui(QMainWindow):
         wipe_tab = QWidget()
         wipe_tab_layout = QVBoxLayout(wipe_tab)
         self.wipe_button = SpinningButton(
-            text=self.tr("Wipe Device"), enable_signal=self.usb.signal_end_hwi_blocker, parent=wipe_tab
+            text=self.tr("Wipe Device"),
+            enable_signal=self.usb.signal_end_hwi_blocker,
+            parent=wipe_tab,
         )
         self.wipe_button.clicked.connect(self.wipe_device)
         wipe_tab_layout.addWidget(self.wipe_button)
@@ -121,7 +132,9 @@ class ToolGui(QMainWindow):
         show_seed_tab = QWidget()
         show_seed_tab_layout = QVBoxLayout(show_seed_tab)
         self.show_seed_button = SpinningButton(
-            text=self.tr("Show Seed"), enable_signal=self.usb.signal_end_hwi_blocker, parent=show_seed_tab
+            text=self.tr("Show Seed"),
+            enable_signal=self.usb.signal_end_hwi_blocker,
+            parent=show_seed_tab,
         )
         self.show_seed_button.clicked.connect(self.write_down_seed)
         show_seed_tab_layout.addWidget(self.show_seed_button)
@@ -150,18 +163,19 @@ class ToolGui(QMainWindow):
     def install_udev(self):
         self.usb.linux_cmd_install_udev_as_sudo()
 
-    def wipe_device(self) -> Optional[bool]:
+    def wipe_device(self) -> bool | None:
         return self.usb.wipe_device()
 
-    def write_down_seed(self) -> Optional[bool]:
+    def write_down_seed(self) -> bool | None:
         return self.usb.write_down_seed()
 
-    def display_address(self) -> Optional[str]:
+    def display_address(self) -> str | None:
         return self.usb.display_address(address_descriptor=self.descriptor_text_edit.toPlainText())
 
     def sign_message(self) -> None:
         signed_message = self.usb.sign_message(
-            self.message_text_edit.toPlainText(), self.message_address_index_line_edit.text()
+            self.message_text_edit.toPlainText(),
+            self.message_address_index_line_edit.text(),
         )
         if signed_message:
             self.message_text_edit.setText(signed_message)
@@ -191,7 +205,7 @@ class ToolGui(QMainWindow):
         if xpubs:
             txt = "\n".join(
                 [
-                    f"{str(k)}: [{k.key_origin(self.usb.network).replace('m/',f'{ fingerprint}/')}]  {v}"
+                    f"{str(k)}: [{k.key_origin(self.usb.network).replace('m/', f'{fingerprint}/')}]  {v}"
                     for k, v in xpubs.items()
                 ]
             )

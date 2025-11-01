@@ -29,9 +29,9 @@
 
 import os
 import sys
-from typing import Optional
 
-from PyQt6.QtCore import QRectF, QSize, QTimer, pyqtBoundSignal
+from bitcoin_safe_lib.gui.qt.signal_tracker import SignalProtocol
+from PyQt6.QtCore import QRectF, QSize, QTimer
 from PyQt6.QtGui import QIcon, QPainter, QPaintEvent
 from PyQt6.QtSvg import QSvgRenderer
 from PyQt6.QtWidgets import QApplication, QMainWindow, QPushButton, QVBoxLayout, QWidget
@@ -46,12 +46,15 @@ def icon_path(icon_basename: str) -> str:
     return resource_path("icons", icon_basename)
 
 
+DEFAULT_ENABLED_ICON = QIcon()
+
+
 class SpinningButton(QPushButton):
     def __init__(
         self,
         text: str,
-        enable_signal: pyqtBoundSignal | None = None,
-        enabled_icon=QIcon(),
+        enable_signal: SignalProtocol[[]] | None = None,
+        enabled_icon=DEFAULT_ENABLED_ICON,
         spinning_svg_path=None,
         parent=None,
         timeout=60,
@@ -90,7 +93,7 @@ class SpinningButton(QPushButton):
         self.setEnabled(True)
         self.timeout_timer.stop()
 
-    def set_enable_signal(self, enable_signal: pyqtBoundSignal) -> None:
+    def set_enable_signal(self, enable_signal: SignalProtocol) -> None:
         if enable_signal:
             enable_signal.connect(self.enable_button)
 
@@ -116,7 +119,7 @@ class SpinningButton(QPushButton):
         self.rotation_angle = (self.rotation_angle + 10) % 360
         self.update()  # Trigger repaint
 
-    def paintEvent(self, a0: Optional[QPaintEvent]) -> None:
+    def paintEvent(self, a0: QPaintEvent | None) -> None:
         super().paintEvent(a0)
 
         if self.timer.isActive():
@@ -163,7 +166,7 @@ if __name__ == "__main__":
 
     class MainWindow(QMainWindow):
         def __init__(self) -> None:
-            super(MainWindow, self).__init__()
+            super().__init__()
 
             # Replace 'path/to/your.svg' with the path to your SVG file
             self.button = SpinningButton("Button Text", spinning_svg_path=icon_path("loader-icon.svg"))

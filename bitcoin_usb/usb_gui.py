@@ -3,10 +3,11 @@ import platform
 import re
 import tempfile
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, cast
 
 import bdkpython as bdk
 import hwilib.commands as hwi_commands
+from bitcoin_safe_lib.gui.qt.signal_tracker import SignalProtocol
 from bitcoin_safe_lib.gui.qt.util import question_dialog
 from bitcoin_safe_lib.util_os import xdg_open_file
 from hwilib.devices.bitbox02 import Bitbox02Client
@@ -44,7 +45,7 @@ class USBMultisigRegisteringNotSupported(Exception):
 
 
 class USBGui(QObject):
-    signal_end_hwi_blocker = pyqtSignal()
+    signal_end_hwi_blocker = cast(SignalProtocol[[]], pyqtSignal())
 
     def __init__(
         self,
@@ -64,10 +65,10 @@ class USBGui(QObject):
     def set_initalization_label(self, value: str):
         self.initalization_label = clean_string(value)
 
-    def get_devices(self, slow_hwi_listing=False) -> List[Dict[str, Any]]:
+    def get_devices(self, slow_hwi_listing=False) -> list[dict[str, Any]]:
         "Returns the found devices WITHOUT unlocking them first.  Misses the fingerprints"
         allow_emulators = False
-        devices: List[Dict[str, Any]] = []
+        devices: list[dict[str, Any]] = []
 
         try:
             if slow_hwi_listing:
@@ -81,7 +82,8 @@ class USBGui(QObject):
 
                 devices = ThreadedWaitingDialog(
                     func=lambda: hwi_commands.enumerate(
-                        allow_emulators=allow_emulators, chain=bdknetwork_to_chain(self.network)
+                        allow_emulators=allow_emulators,
+                        chain=bdknetwork_to_chain(self.network),
                     ),
                     title=self.tr("Unlock USB devices"),
                     message=self.tr("Please unlock USB devices"),
@@ -93,7 +95,7 @@ class USBGui(QObject):
             logger.error(str(e))
         return devices
 
-    def get_device(self, slow_hwi_listing=False) -> Dict[str, Any] | None:
+    def get_device(self, slow_hwi_listing=False) -> dict[str, Any] | None:
         "Returns the found devices WITHOUT unlocking them first.  Misses the fingerprints"
         devices = self.get_devices(slow_hwi_listing=slow_hwi_listing)
 
@@ -131,13 +133,12 @@ class USBGui(QObject):
                 self.signal_end_hwi_blocker.emit()
         return None
 
-    def sign(self, psbt: bdk.Psbt, slow_hwi_listing=False) -> Optional[bdk.Psbt]:
+    def sign(self, psbt: bdk.Psbt, slow_hwi_listing=False) -> bdk.Psbt | None:
         selected_device = self.get_device(slow_hwi_listing=slow_hwi_listing)
         if not selected_device:
             return None
 
         try:
-
             with USBDevice(
                 selected_device=selected_device,
                 network=self.network,
@@ -154,7 +155,7 @@ class USBGui(QObject):
 
     def get_fingerprint_and_xpubs(
         self, slow_hwi_listing=False
-    ) -> Optional[Tuple[Dict[str, Any], str, Dict[AddressType, str]]]:
+    ) -> tuple[dict[str, Any], str, dict[AddressType, str]] | None:
         selected_device = self.get_device(slow_hwi_listing=slow_hwi_listing)
         if not selected_device:
             return None
@@ -175,7 +176,7 @@ class USBGui(QObject):
 
     def get_fingerprint_and_xpub(
         self, key_origin: str, slow_hwi_listing=False
-    ) -> Optional[Tuple[Dict[str, Any], str, str]]:
+    ) -> tuple[dict[str, Any], str, str] | None:
         selected_device = self.get_device(slow_hwi_listing=slow_hwi_listing)
         if not selected_device:
             return None
@@ -194,7 +195,7 @@ class USBGui(QObject):
             self.signal_end_hwi_blocker.emit()
         return None
 
-    def sign_message(self, message: str, bip32_path: str, slow_hwi_listing=False) -> Optional[str]:
+    def sign_message(self, message: str, bip32_path: str, slow_hwi_listing=False) -> str | None:
         selected_device = self.get_device(slow_hwi_listing=slow_hwi_listing)
         if not selected_device:
             return None
@@ -213,7 +214,7 @@ class USBGui(QObject):
             self.signal_end_hwi_blocker.emit()
         return None
 
-    def display_address(self, address_descriptor: str, slow_hwi_listing=False) -> Optional[str]:
+    def display_address(self, address_descriptor: str, slow_hwi_listing=False) -> str | None:
         selected_device = self.get_device(slow_hwi_listing=slow_hwi_listing)
         if not selected_device:
             return None
@@ -234,7 +235,7 @@ class USBGui(QObject):
             self.signal_end_hwi_blocker.emit()
         return None
 
-    def wipe_device(self, slow_hwi_listing=False) -> Optional[bool]:
+    def wipe_device(self, slow_hwi_listing=False) -> bool | None:
         selected_device = self.get_device(slow_hwi_listing=slow_hwi_listing)
         if not selected_device:
             return None
@@ -253,7 +254,7 @@ class USBGui(QObject):
             self.signal_end_hwi_blocker.emit()
         return None
 
-    def write_down_seed(self, slow_hwi_listing=False) -> Optional[bool]:
+    def write_down_seed(self, slow_hwi_listing=False) -> bool | None:
         selected_device = self.get_device(slow_hwi_listing=slow_hwi_listing)
         if not selected_device:
             return None
@@ -268,7 +269,9 @@ class USBGui(QObject):
                     return dev.write_down_seed(dev.client)
                 else:
                     QMessageBox.information(
-                        None, "Not supported", "This is currently only supported for Bitbox02"
+                        None,
+                        "Not supported",
+                        "This is currently only supported for Bitbox02",
                     )
         except Exception as e:
             if not self.handle_exception_write_down_seed(e):
@@ -277,7 +280,7 @@ class USBGui(QObject):
             self.signal_end_hwi_blocker.emit()
         return None
 
-    def register_multisig(self, address_descriptor: str, slow_hwi_listing=False) -> Optional[str]:
+    def register_multisig(self, address_descriptor: str, slow_hwi_listing=False) -> str | None:
         selected_device = self.get_device(slow_hwi_listing=slow_hwi_listing)
         if not selected_device:
             return None
@@ -333,18 +336,18 @@ class USBGui(QObject):
         return True
 
     def show_error_message(self, text: str) -> None:
-
         if platform.system() == "Linux":
             self.show_error_message_linux(text)
         else:
             msg_box = get_message_box(
-                text=text, icon=QMessageBox.Icon.Critical, title=translate("bitcoin_usb", "Error")
+                text=text,
+                icon=QMessageBox.Icon.Critical,
+                title=translate("bitcoin_usb", "Error"),
             )
             # Show the text box and wait for a response
             msg_box.exec()
 
     def show_error_message_linux(self, text: str) -> None:
-
         # Create the text box
         msg_box = QMessageBox()
         msg_box.setIcon(QMessageBox.Icon.Critical)

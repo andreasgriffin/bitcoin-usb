@@ -1,5 +1,4 @@
 import logging
-from typing import Tuple
 
 import bdkpython as bdk
 from mnemonic import Mnemonic
@@ -16,7 +15,7 @@ def get_mnemonic_seed(mnemonic: str):
     return mnemo.to_seed(mnemonic)
 
 
-def derive(mnemonic: str, key_origin: str, network: bdk.Network) -> Tuple[str, str]:
+def derive(mnemonic: str, key_origin: str, network: bdk.Network) -> tuple[str, str]:
     """returns:
             xpub  (at key_origin)
             fingerprint  (at root)
