@@ -1,10 +1,10 @@
 import sys
 import time
-from typing import Any, Dict, List
+from typing import Any, Callable, Dict, Generic, List, Optional, TypeVar
 
 import bdkpython as bdk
 from PyQt6.QtCore import QEventLoop, QObject, QThread, pyqtSignal
-from PyQt6.QtGui import QGuiApplication
+from PyQt6.QtGui import QCloseEvent, QGuiApplication
 from PyQt6.QtWidgets import (
     QApplication,
     QDialog,
@@ -43,15 +43,23 @@ class Worker(QObject):
 
     def run(self):
         try:
-            result = self.func(*self.args, **self.kwargs)
-            self.finished.emit(result)  # Emit the result if successful
+            func_result = self.func(*self.args, **self.kwargs)
+            self.finished.emit(func_result)  # Emit the func_result if successful
         except Exception as e:
             self.error.emit(e)  # Emit error if an exception occurs
 
 
-class ThreadedWaitingDialog(QDialog):
+T = TypeVar("T")
+
+
+class ThreadedWaitingDialog(QDialog, Generic[T]):
     def __init__(
-        self, func, *args, title="Processing...", message="Please wait, processing operation...", **kwargs
+        self,
+        func: Callable[[], T],
+        *args,
+        title="Processing...",
+        message="Please wait, processing operation...",
+        **kwargs,
     ):
         super().__init__()
         self.setWindowTitle(title)
@@ -72,8 +80,8 @@ class ThreadedWaitingDialog(QDialog):
         self.loop = QEventLoop()  # Event loop to block for synchronous execution
         self.exception = None  # To store an exception, if it occurs
 
-    def handle_func_result(self, result):
-        self.result = result
+    def handle_func_result(self, func_result: T):
+        self.func_result = func_result
         if self.loop.isRunning():
             self.loop.exit()  # Exit the loop only if it's running
 
@@ -82,20 +90,20 @@ class ThreadedWaitingDialog(QDialog):
         if self.loop.isRunning():
             self.loop.exit()  # Exit the loop when an error is encountered
 
-    def get_result(self):
+    def get_result(self) -> T:
         self.show()  # Show the dialog
         self._thread.start()  # Start the thread
         self.loop.exec()  # Block here until the operation finishes or errors out
         self.close()  # Close the dialog
         if self.exception:
             raise self.exception  # Re-raise the exception after closing the dialog
-        return self.result
+        return self.func_result
 
-    def closeEvent(self, event):
+    def closeEvent(self, a0: Optional[QCloseEvent]) -> None:
         if self._thread.isRunning():
             self._thread.quit()
             self._thread.wait()
-        super().closeEvent(event)
+        super().closeEvent(a0)
 
 
 class DeviceDialog(QDialog):
@@ -144,7 +152,7 @@ if __name__ == "__main__":
             return {"res": "res"}
 
         manager = ThreadedWaitingDialog(f, title="Operation In Progress", message="Processing data...")
-        result = manager.get_result()  # Get result directly via method
-        print("Operation completed with result:", result)
+        func_result = manager.get_result()  # Get func_result directly via method
+        print("Operation completed with func_result:", func_result)
 
     main()

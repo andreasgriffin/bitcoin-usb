@@ -187,6 +187,7 @@ def bdknetwork_to_chain(network: bdk.Network):
         return Chain.SIGNET
     elif network in [bdk.Network.TESTNET, bdk.Network.TESTNET4]:
         return Chain.TEST
+    raise ValueError(f"Could not convert the {network=}")
 
 
 class BaseDevice:
@@ -202,7 +203,7 @@ class BaseDevice:
         pass
 
     @abstractmethod
-    def sign_psbt(self, psbt: bdk.Psbt) -> bdk.Psbt:
+    def sign_psbt(self, psbt: bdk.Psbt) -> bdk.Psbt | None:
         pass
 
     @abstractmethod
@@ -263,7 +264,7 @@ class USBDevice(BaseDevice, QObject):
             if device_info["path"].decode() != client.device_path:
                 continue
 
-            bb02 = bitbox02.BitBox02(
+            bb02 = bitbox02.BitBox02(  # type: ignore
                 transport=client.transport,
                 device_info=device_info,
                 noise_config=client.noise_config,
