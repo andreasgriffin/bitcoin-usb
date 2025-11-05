@@ -11,7 +11,7 @@ disable_error_code = "assignment"
 
 [tool.poetry]
 name = "bitcoin-usb"
-version = "1.0.2"
+version = "2.0.0"
 authors = ["andreasgriffin <andreasgriffin@proton.me>"]
 license = "GPL-3.0"
 readme = "README.md"
@@ -27,7 +27,7 @@ pyqt6 = "^6.6.1"
 mnemonic = "^0.21"
 requests = "^2.32.3" # essential for Jade to work
 trezor = "^0.13.9" 
-bitcoin-safe-lib = {  git = "https://github.com/andreasgriffin/bitcoin-safe-lib.git", branch = "bdk2.x" }  #  "^0.3.3"
+bitcoin-safe-lib = {  git = "https://github.com/andreasgriffin/bitcoin-safe-lib.git", branch = "main" }  
 
 
 [tool.poetry.group.dev.dependencies]
