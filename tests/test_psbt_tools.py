@@ -1,6 +1,5 @@
 import bdkpython as bdk
 
-from bitcoin_usb.address_types import bdk
 
 # test seeds
 # seed1: spider manual inform reject arch raccoon betray moon document across main build

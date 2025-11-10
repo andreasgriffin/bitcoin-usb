@@ -1,5 +1,5 @@
 """
-trezorlib.cli.firmware.update can stop/exit such, that it would halt the entire python 
+trezorlib.cli.firmware.update can stop/exit such, that it would halt the entire python
 program. Therefore I encapsulate it in this script, such that it can be called safely.
 """
 
@@ -14,7 +14,7 @@ parser.add_argument(
     "--path",
     required=True,
     type=str,
-    help=f"The device path from HWI",
+    help="The device path from HWI",
 )
 args = parser.parse_args()
 path = args.path

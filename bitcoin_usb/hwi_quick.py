@@ -1,6 +1,6 @@
 import importlib
 import logging
-from typing import Any, Dict, List
+from typing import Any
 from unittest.mock import MagicMock, patch
 
 import bdkpython as bdk
@@ -43,9 +43,8 @@ class HWIQuick:
 
         result = []
         for device_info in imported_bitbox02.get_any_bitbox02s():
-
             path = device_info["path"].decode()
-            d_data: Dict[str, object] = {}
+            d_data: dict[str, object] = {}
 
             d_data.update(
                 {
@@ -80,7 +79,7 @@ class HWIQuick:
         mock_keepkey_client,
         mock_coldcard_client,
         mock_jade_client,
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         "This enumerates the devices without unlocking them. It cannot retrieve the fingerprint"
         allow_emulators = False
         devices = []
