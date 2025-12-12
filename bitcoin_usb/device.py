@@ -7,6 +7,7 @@ from typing import Any
 
 import bdkpython as bdk
 import hwilib.commands as hwi_commands
+from bitcoin_safe_lib.async_tools.loop_in_thread import LoopInThread
 from hwilib.common import Chain
 from hwilib.devices.bitbox02 import Bitbox02Client, CLINoiseConfig
 from hwilib.devices.bitbox02_lib import bitbox02
@@ -26,7 +27,7 @@ from PyQt6.QtWidgets import (
 
 from bitcoin_usb.dialogs import Worker
 from bitcoin_usb.i18n import translate
-from bitcoin_usb.util import run_script
+from bitcoin_usb.util import run_device_task, run_script
 
 from .address_types import (
     AddressType,
@@ -81,30 +82,6 @@ def question_dialog(
     elif ret == QMessageBox.StandardButton.Cancel:
         return False
     return False
-
-
-def show_non_modal_message_box(on_accept, on_reject):
-    # Create a message box
-    msg_box = QMessageBox()
-    msg_box.setIcon(QMessageBox.Icon.Information)
-    msg_box.setText("This is an informational message.")
-    msg_box.setWindowTitle("Information")
-    msg_box.setStandardButtons(QMessageBox.StandardButton.Ok | QMessageBox.StandardButton.Cancel)
-
-    # Connect the buttons to the custom functions
-    msg_box.buttonClicked.connect(
-        lambda btn: on_accept() if btn == msg_box.button(QMessageBox.StandardButton.Ok) else None
-    )
-    msg_box.buttonClicked.connect(
-        lambda btn: on_reject() if btn == msg_box.button(QMessageBox.StandardButton.Cancel) else None
-    )
-
-    # Set the message box to be non-modal
-    msg_box.setWindowModality(Qt.WindowModality.NonModal)
-
-    # Show the message box
-    msg_box.show()
-    return msg_box
 
 
 class ThreadedCapturePrintDialogBitBox02(QDialog):
@@ -256,6 +233,7 @@ class USBDevice(BaseDevice, QObject):
         self,
         selected_device: dict[str, Any],
         network: bdk.Network,
+        loop_in_thread: LoopInThread | None = None,
         initalization_label: str = "",
     ):
         QObject.__init__(self)
@@ -263,6 +241,7 @@ class USBDevice(BaseDevice, QObject):
         self.initalization_label = initalization_label
         self.selected_device = selected_device
         self.lock = threading.Lock()
+        self.loop_in_thread = loop_in_thread
         self.client: HardwareWalletClient | None = None
 
     @staticmethod
@@ -304,8 +283,7 @@ class USBDevice(BaseDevice, QObject):
                 return success
         return False
 
-    def __enter__(self):
-        self.lock.acquire()
+    def _init_client(self):
         self.client = hwi_commands.get_client(
             device_type=self.selected_device["type"],
             device_path=self.selected_device["path"],
@@ -355,7 +333,16 @@ class USBDevice(BaseDevice, QObject):
                 else:
                     self.client.setup_device(label=self.initalization_label)
                     self.write_down_seed_ask_until_success(self.client)
-        return self
+
+    def __enter__(self):
+        self.lock.acquire()
+        try:
+            # _init_client is a synchronous function; we just use the common runner
+            run_device_task(loop_in_thread=self.loop_in_thread, task=self._init_client)
+            return self
+        except Exception:
+            self.lock.release()
+            raise
 
     def __exit__(self, exc_type, exc_value, traceback):
         if self.client:

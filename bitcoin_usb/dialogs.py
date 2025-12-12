@@ -1,6 +1,7 @@
 import sys
 import time
 from collections.abc import Callable
+from functools import partial
 from typing import Any, Generic, TypeVar
 
 import bdkpython as bdk
@@ -117,7 +118,7 @@ class DeviceDialog(QDialog):
         # Creating a button for each device
         for device in devices:
             button = QPushButton(f"{device.get('type', '')} - {device.get('model', '')}", self)
-            button.clicked.connect(lambda *args, d=device: self.select_device(d))
+            button.clicked.connect(partial(self.select_device, device))
             self._layout.addWidget(button)
 
         self.selected_device: dict[str, Any] | None = None
