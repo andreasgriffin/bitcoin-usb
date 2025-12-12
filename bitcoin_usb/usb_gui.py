@@ -2,11 +2,13 @@ import logging
 import platform
 import re
 import tempfile
+from functools import partial
 from pathlib import Path
 from typing import Any, cast
 
 import bdkpython as bdk
 import hwilib.commands as hwi_commands
+from bitcoin_safe_lib.async_tools.loop_in_thread import LoopInThread
 from bitcoin_safe_lib.gui.qt.signal_tracker import SignalProtocol
 from bitcoin_safe_lib.gui.qt.util import question_dialog
 from bitcoin_safe_lib.util_os import xdg_open_file
@@ -17,6 +19,7 @@ from PyQt6.QtWidgets import QMessageBox, QPushButton
 from bitcoin_usb.address_types import AddressType
 from bitcoin_usb.dialogs import DeviceDialog, ThreadedWaitingDialog, get_message_box
 from bitcoin_usb.hwi_quick import HWIQuick
+from bitcoin_usb.util import run_device_task
 
 from .device import USBDevice, bdknetwork_to_chain
 from .i18n import translate
@@ -50,6 +53,7 @@ class USBGui(QObject):
     def __init__(
         self,
         network: bdk.Network,
+        loop_in_thread: LoopInThread,
         allow_emulators_only_for_testnet_works: bool = True,
         autoselect_if_1_device=False,
         initalization_label="",
@@ -58,6 +62,7 @@ class USBGui(QObject):
         super().__init__()
         self.autoselect_if_1_device = autoselect_if_1_device
         self.network = network
+        self.loop_in_thread = loop_in_thread
         self._parent = parent
         self.initalization_label = clean_string(initalization_label)
         self.allow_emulators_only_for_testnet_works = allow_emulators_only_for_testnet_works
@@ -81,7 +86,8 @@ class USBGui(QObject):
                     ]
 
                 devices = ThreadedWaitingDialog(
-                    func=lambda: hwi_commands.enumerate(
+                    partial(
+                        hwi_commands.enumerate,
                         allow_emulators=allow_emulators,
                         chain=bdknetwork_to_chain(self.network),
                     ),
@@ -142,9 +148,10 @@ class USBGui(QObject):
             with USBDevice(
                 selected_device=selected_device,
                 network=self.network,
+                loop_in_thread=self.loop_in_thread,
                 initalization_label=self.initalization_label,
             ) as dev:
-                return dev.sign_psbt(psbt)
+                return run_device_task(loop_in_thread=self.loop_in_thread, task=partial(dev.sign_psbt, psbt))
         except Exception as e:
             if not self.handle_exception_sign(e):
                 raise
@@ -164,9 +171,14 @@ class USBGui(QObject):
             with USBDevice(
                 selected_device=selected_device,
                 network=self.network,
+                loop_in_thread=self.loop_in_thread,
                 initalization_label=self.initalization_label,
             ) as dev:
-                return selected_device, dev.get_fingerprint(), dev.get_xpubs()
+
+                def f():
+                    return (selected_device, dev.get_fingerprint(), dev.get_xpubs())
+
+                return run_device_task(loop_in_thread=self.loop_in_thread, task=f)
         except Exception as e:
             if not self.handle_exception_get_fingerprint_and_xpubs(e):
                 raise
@@ -185,9 +197,14 @@ class USBGui(QObject):
             with USBDevice(
                 selected_device=selected_device,
                 network=self.network,
+                loop_in_thread=self.loop_in_thread,
                 initalization_label=self.initalization_label,
             ) as dev:
-                return selected_device, dev.get_fingerprint(), dev.get_xpub(key_origin)
+
+                def f():
+                    return (selected_device, dev.get_fingerprint(), dev.get_xpub(key_origin))
+
+                return run_device_task(loop_in_thread=self.loop_in_thread, task=f)
         except Exception as e:
             if not self.handle_exception_get_fingerprint_and_xpubs(e):
                 raise
@@ -204,9 +221,12 @@ class USBGui(QObject):
             with USBDevice(
                 selected_device=selected_device,
                 network=self.network,
+                loop_in_thread=self.loop_in_thread,
                 initalization_label=self.initalization_label,
             ) as dev:
-                return dev.sign_message(message, bip32_path)
+                return run_device_task(
+                    loop_in_thread=self.loop_in_thread, task=partial(dev.sign_message, message, bip32_path)
+                )
         except Exception as e:
             if not self.handle_exception_sign_message(e):
                 raise
@@ -223,10 +243,11 @@ class USBGui(QObject):
             with USBDevice(
                 selected_device=selected_device,
                 network=self.network,
+                loop_in_thread=self.loop_in_thread,
                 initalization_label=self.initalization_label,
             ) as dev:
-                return dev.display_address(
-                    address_descriptor=address_descriptor,
+                return run_device_task(
+                    loop_in_thread=self.loop_in_thread, task=partial(dev.display_address, address_descriptor)
                 )
         except Exception as e:
             if not self.handle_exception_display_address(e):
@@ -244,9 +265,10 @@ class USBGui(QObject):
             with USBDevice(
                 selected_device=selected_device,
                 network=self.network,
+                loop_in_thread=self.loop_in_thread,
                 initalization_label=self.initalization_label,
             ) as dev:
-                return dev.wipe_device()
+                return run_device_task(loop_in_thread=self.loop_in_thread, task=dev.wipe_device)
         except Exception as e:
             if not self.handle_exception_wipe(e):
                 raise
@@ -263,16 +285,19 @@ class USBGui(QObject):
             with USBDevice(
                 selected_device=selected_device,
                 network=self.network,
+                loop_in_thread=self.loop_in_thread,
                 initalization_label=self.initalization_label,
             ) as dev:
                 if isinstance(dev.client, Bitbox02Client):
-                    return dev.write_down_seed(dev.client)
-                else:
-                    QMessageBox.information(
-                        None,
-                        "Not supported",
-                        "This is currently only supported for Bitbox02",
+                    return run_device_task(
+                        loop_in_thread=self.loop_in_thread, task=partial(dev.write_down_seed, dev.client)
                     )
+
+                QMessageBox.information(
+                    None,
+                    "Not supported",
+                    "This is currently only supported for Bitbox02",
+                )
         except Exception as e:
             if not self.handle_exception_write_down_seed(e):
                 raise
@@ -296,10 +321,11 @@ class USBGui(QObject):
             with USBDevice(
                 selected_device=selected_device,
                 network=self.network,
+                loop_in_thread=self.loop_in_thread,
                 initalization_label=self.initalization_label,
             ) as dev:
-                return dev.display_address(
-                    address_descriptor=address_descriptor,
+                return run_device_task(
+                    loop_in_thread=self.loop_in_thread, task=partial(dev.display_address, address_descriptor)
                 )
         except Exception as e:
             if not self.handle_exception_display_address(e):
@@ -376,7 +402,7 @@ class USBGui(QObject):
             # Add a custom button
             install_button = QPushButton(translate("bitcoin_usb", "Install udev files"))
             msg_box.addButton(install_button, QMessageBox.ButtonRole.ActionRole)
-            install_button.clicked.connect(lambda: self.linux_cmd_install_udev_as_sudo())
+            install_button.clicked.connect(self.linux_cmd_install_udev_as_sudo)
 
         # Show the text box and wait for a response
         msg_box.exec()

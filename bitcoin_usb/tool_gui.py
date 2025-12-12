@@ -1,6 +1,8 @@
 import platform
+from functools import partial
 
 import bdkpython as bdk
+from bitcoin_safe_lib.async_tools.loop_in_thread import LoopInThread
 from PyQt6.QtGui import QKeySequence, QShortcut
 from PyQt6.QtWidgets import (
     QComboBox,
@@ -19,10 +21,10 @@ from bitcoin_usb.usb_gui import USBGui
 
 
 class ToolGui(QMainWindow):
-    def __init__(self, network: bdk.Network):
+    def __init__(self, network: bdk.Network, loop_in_thread: LoopInThread):
         super().__init__()
         self.setWindowTitle(self.tr("USB Signer Tools"))
-        self.usb = USBGui(network=network)
+        self.usb = USBGui(network=network, loop_in_thread=loop_in_thread)
 
         main_widget = QWidget()
         main_widget_layout = QVBoxLayout(main_widget)
@@ -152,7 +154,7 @@ class ToolGui(QMainWindow):
         # Initialize the network selection
 
         self.combo_network.currentIndexChanged.connect(
-            lambda idx: self.usb.set_network(bdk.Network[self.combo_network.currentText()])  # type: ignore
+            partial(self.usb.set_network, bdk.Network[self.combo_network.currentText()])
         )
 
         self.shortcut_close = QShortcut(QKeySequence("Ctrl+W"), self)
