@@ -3,6 +3,7 @@ from functools import partial
 
 import bdkpython as bdk
 from bitcoin_safe_lib.async_tools.loop_in_thread import LoopInThread
+from bitcoin_safe_lib.gui.qt.spinning_button import SpinningButton
 from PyQt6.QtGui import QKeySequence, QShortcut
 from PyQt6.QtWidgets import (
     QComboBox,
@@ -16,7 +17,6 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
-from bitcoin_usb.spinning_button import SpinningButton
 from bitcoin_usb.usb_gui import USBGui
 
 
@@ -45,7 +45,7 @@ class ToolGui(QMainWindow):
         unlock_layout = QVBoxLayout(unlock_tab)
         button = SpinningButton(
             text=self.tr("Unlock Devices"),
-            enable_signal=self.usb.signal_end_hwi_blocker,
+            signal_stop_spinning=self.usb.signal_end_hwi_blocker,
             parent=unlock_tab,
         )
         button.clicked.connect(self.on_button_unlock_clicked)
@@ -57,7 +57,7 @@ class ToolGui(QMainWindow):
         xpubs_layout = QVBoxLayout(xpubs_tab)
         self.button = SpinningButton(
             text=self.tr("Get xpubs"),
-            enable_signal=self.usb.signal_end_hwi_blocker,
+            signal_stop_spinning=self.usb.signal_end_hwi_blocker,
             parent=xpubs_tab,
         )
         self.button.clicked.connect(self.on_button_xpubs_clicked)
@@ -75,7 +75,7 @@ class ToolGui(QMainWindow):
         psbt_layout.addWidget(self.psbt_text_edit)
         self.psbt_button = SpinningButton(
             text=self.tr("Sign PSBT"),
-            enable_signal=self.usb.signal_end_hwi_blocker,
+            signal_stop_spinning=self.usb.signal_end_hwi_blocker,
             parent=psbt_tab,
         )
         self.psbt_button.clicked.connect(self.sign)
@@ -94,7 +94,7 @@ class ToolGui(QMainWindow):
         message_layout.addWidget(self.message_address_index_line_edit)
         self.sign_message_button = SpinningButton(
             text=self.tr("Sign Message"),
-            enable_signal=self.usb.signal_end_hwi_blocker,
+            signal_stop_spinning=self.usb.signal_end_hwi_blocker,
             parent=message_tab,
         )
         self.sign_message_button.clicked.connect(self.sign_message)
@@ -111,7 +111,7 @@ class ToolGui(QMainWindow):
         address_tab_layout.addWidget(self.descriptor_text_edit)
         self.display_address_button = SpinningButton(
             text=self.tr("Display Address"),
-            enable_signal=self.usb.signal_end_hwi_blocker,
+            signal_stop_spinning=self.usb.signal_end_hwi_blocker,
             parent=address_tab,
         )
         self.display_address_button.clicked.connect(self.display_address)
@@ -123,7 +123,7 @@ class ToolGui(QMainWindow):
         wipe_tab_layout = QVBoxLayout(wipe_tab)
         self.wipe_button = SpinningButton(
             text=self.tr("Wipe Device"),
-            enable_signal=self.usb.signal_end_hwi_blocker,
+            signal_stop_spinning=self.usb.signal_end_hwi_blocker,
             parent=wipe_tab,
         )
         self.wipe_button.clicked.connect(self.wipe_device)
@@ -135,7 +135,7 @@ class ToolGui(QMainWindow):
         show_seed_tab_layout = QVBoxLayout(show_seed_tab)
         self.show_seed_button = SpinningButton(
             text=self.tr("Show Seed"),
-            enable_signal=self.usb.signal_end_hwi_blocker,
+            signal_stop_spinning=self.usb.signal_end_hwi_blocker,
             parent=show_seed_tab,
         )
         self.show_seed_button.clicked.connect(self.write_down_seed)
