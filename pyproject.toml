@@ -28,7 +28,7 @@ mnemonic = "^0.21"
 requests = "^2.32.3" # essential for Jade to work
 trezor = "^0.13.9" 
 bitcoin-safe-lib = {  git = "https://github.com/andreasgriffin/bitcoin-safe-lib.git", branch = "main" }  
-cbor2 = "<5.8.0"  # see https://github.com/bitcoin-core/HWI/issues/817
+cbor2 = "<5.9.0"  # see https://github.com/bitcoin-core/HWI/issues/817
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^8.2.2"
