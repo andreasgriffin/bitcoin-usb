@@ -12,6 +12,7 @@ from hwilib.common import Chain
 from hwilib.devices.bitbox02 import Bitbox02Client, CLINoiseConfig
 from hwilib.devices.bitbox02_lib import bitbox02
 from hwilib.devices.bitbox02_lib.communication import devices as bitbox02devices
+from hwilib.devices.jadepy.jade import DEFAULT_BLE_DEVICE_NAME
 from hwilib.devices.trezor import TrezorClient
 from hwilib.hwwclient import HardwareWalletClient
 from hwilib.psbt import PSBT
@@ -27,6 +28,7 @@ from PyQt6.QtWidgets import (
 
 from bitcoin_usb.dialogs import Worker
 from bitcoin_usb.i18n import translate
+from bitcoin_usb.jade_ble_client import JadeBleClient
 from bitcoin_usb.util import run_device_task, run_script
 
 from .address_types import (
@@ -284,11 +286,22 @@ class USBDevice(BaseDevice, QObject):
         return False
 
     def _init_client(self):
-        self.client = hwi_commands.get_client(
-            device_type=self.selected_device["type"],
-            device_path=self.selected_device["path"],
-            chain=bdknetwork_to_chain(self.network),
-        )
+        if (
+            self.selected_device.get("type") == "jade"
+            and self.selected_device.get("transport") == "bluetooth"
+        ):
+            self.client = JadeBleClient(
+                device_name=self.selected_device.get("bluetooth_name", DEFAULT_BLE_DEVICE_NAME),
+                serial_number=self.selected_device.get("bluetooth_serial_number"),
+                device_address=self.selected_device.get("bluetooth_address"),
+                chain=bdknetwork_to_chain(self.network),
+            )
+        else:
+            self.client = hwi_commands.get_client(
+                device_type=self.selected_device["type"],
+                device_path=self.selected_device["path"],
+                chain=bdknetwork_to_chain(self.network),
+            )
 
         if isinstance(self.client, TrezorClient):
             self.client.client.refresh_features()

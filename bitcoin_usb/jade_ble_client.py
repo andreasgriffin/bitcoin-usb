@@ -1,0 +1,271 @@
+import asyncio
+import collections
+import os
+import platform
+import shutil
+import subprocess
+from contextvars import ContextVar
+from typing import Any
+
+import semver
+from bleak import BleakScanner
+from hwilib.common import Chain
+from hwilib.devices.jade import HAS_NETWORKING, JadeClient
+from hwilib.devices.jadepy import jade as hwi_jade_module
+from hwilib.devices.jadepy.jade import DEFAULT_BLE_SCAN_TIMEOUT, JadeAPI
+from hwilib.devices.jadepy.jade_error import JadeError
+from hwilib.errors import ActionCanceledError, DeviceNotReadyError
+from hwilib.hwwclient import HardwareWalletClient
+from jadepy import jade_ble as jade_ble_module
+from jadepy.jade_ble import JadeBleImpl as BlockstreamJadeBleImpl
+
+DEFAULT_MAX_AUTH_ATTEMPTS = 3
+_IS_BT_DEVICE_PATCHED = False
+_ORIGINAL_JADEPY_SUBPROCESS_RUN = jade_ble_module.subprocess.run
+_PREFERRED_BLE_ADDRESS: ContextVar[str | None] = ContextVar("_PREFERRED_BLE_ADDRESS", default=None)
+
+
+def _patch_missing_bt_device_command() -> None:
+    global _IS_BT_DEVICE_PATCHED
+    if _IS_BT_DEVICE_PATCHED or platform.system() != "Linux" or shutil.which("bt-device"):
+        return
+
+    def _safe_subprocess_run(command: Any, *args: Any, **kwargs: Any):
+        if isinstance(command, str) and command.strip().startswith("bt-device --remove"):
+            # bt-device is optional and absent on many Linux distros; skip this cleanup call.
+            return subprocess.CompletedProcess(command, 0)
+        return _ORIGINAL_JADEPY_SUBPROCESS_RUN(command, *args, **kwargs)
+
+    jade_ble_module.subprocess.run = _safe_subprocess_run
+    _IS_BT_DEVICE_PATCHED = True
+
+
+class CompatibleJadeBleImpl(BlockstreamJadeBleImpl):
+    def __init__(
+        self,
+        device_name: str,
+        serial_number: str | None,
+        scan_timeout: int,
+        loop: asyncio.AbstractEventLoop | None,
+    ) -> None:
+        super().__init__(device_name, serial_number, scan_timeout, loop=loop)
+        self.preferred_ble_address = _PREFERRED_BLE_ADDRESS.get()
+        self.client: Any | None = None
+        self.inputstream: Any | None = None
+        self.rx_char_handle: int | None = None
+        self.write_task: asyncio.Task[Any] | None = None
+
+    async def _connect_impl(self) -> None:
+        assert self.client is None
+
+        inbufs: collections.deque[bytes] = collections.deque()
+
+        async def _input_stream():
+            while self.client is not None:
+                while inbufs:
+                    buf = inbufs.popleft()
+                    for b in buf:
+                        yield b
+                await asyncio.sleep(0.01)
+            self.inputstream = None
+
+        self.inputstream = _input_stream()
+
+        device_mac = self.preferred_ble_address
+        full_name = self.device_name
+        if not device_mac:
+            while not device_mac and self.scan_timeout > 0:
+                jade_ble_module.logger.info(f"Scanning, timeout = {self.scan_timeout}s")
+                scan_time = min(2, self.scan_timeout)
+                self.scan_timeout -= scan_time
+
+                devices = await BleakScanner.discover(timeout=scan_time)
+                for dev in devices:
+                    jade_ble_module.logger.debug(f"Seen: {dev.name}")
+                    if (
+                        dev.name
+                        and dev.name.startswith(self.device_name)
+                        and (self.serial_number is None or dev.name.endswith(self.serial_number))
+                    ):
+                        device_mac = dev.address
+                        full_name = dev.name
+
+        if not device_mac:
+            raise JadeError(
+                1,
+                "Unable to locate BLE device",
+                f"Device name: {self.device_name}, Serial number: {self.serial_number or '<any>'}",
+            )
+
+        if platform.system() == "Linux":
+            command = f'bt-device --remove "{device_mac}"'
+            jade_ble_module.subprocess.run(command, shell=True, stdout=subprocess.DEVNULL)
+
+        def _disconnection_handler(client: Any) -> None:
+            assert client == self.client
+            self.client = None
+            if self.write_task:
+                self.write_task.cancel()
+                self.write_task = None
+
+        connected = False
+        attempts_remaining = 5
+        client = None
+        needs_set_disconnection_callback = False
+        while not connected:
+            try:
+                attempts_remaining -= 1
+                try:
+                    client = jade_ble_module.bleak.BleakClient(
+                        device_mac, disconnected_callback=_disconnection_handler
+                    )
+                except TypeError:
+                    client = jade_ble_module.bleak.BleakClient(device_mac)
+                    needs_set_disconnection_callback = True
+
+                jade_ble_module.logger.info(f"Connecting to: {full_name} ({device_mac})")
+                await client.connect()
+                connected = client.is_connected
+                jade_ble_module.logger.info(f"Connected: {connected}")
+            except Exception as e:
+                jade_ble_module.logger.warning(f"BLE connection exception: {e}")
+                if not attempts_remaining:
+                    jade_ble_module.logger.warning("Exhausted retries - BLE connection failed")
+                    raise JadeError(
+                        2,
+                        "Unable to connect to BLE device",
+                        f"Device name: {self.device_name}, Serial number: {self.serial_number or '<any>'}",
+                    ) from e
+
+        if client is None:
+            raise JadeError(
+                2,
+                "Unable to connect to BLE device",
+                f"Device name: {self.device_name}, Serial number: {self.serial_number or '<any>'}",
+            )
+
+        connected_client = client
+        for service in connected_client.services:
+            for char in service.characteristics:
+                if char.uuid == BlockstreamJadeBleImpl.IO_RX_CHAR_UUID:
+                    jade_ble_module.logger.debug(f"Found RX characteristic - handle: {char.handle}")
+                    self.rx_char_handle = char.handle
+
+                if "read" in char.properties:
+                    await connected_client.read_gatt_char(char.uuid)
+
+                for descriptor in char.descriptors:
+                    await connected_client.read_gatt_descriptor(descriptor.handle)
+
+        def _notification_handler(sender: Any, data: Any) -> None:
+            sender_handle = -1
+            if isinstance(sender, int):
+                sender_handle = sender
+            else:
+                try:
+                    sender_handle = int(sender.handle)
+                except Exception:
+                    return
+
+            if sender_handle != self.rx_char_handle:
+                return
+            inbufs.append(bytes(data))
+
+        assert self.rx_char_handle
+        await connected_client.start_notify(self.rx_char_handle, _notification_handler)
+
+        if needs_set_disconnection_callback:
+            connected_client.set_disconnected_callback(_disconnection_handler)
+
+        self.client = connected_client
+
+
+class JadeBleClient(JadeClient):
+    def __init__(
+        self,
+        device_name: str,
+        serial_number: str | None,
+        device_address: str | None = None,
+        password: str | None = None,
+        expert: bool = False,
+        chain: Chain = Chain.MAIN,
+        scan_timeout: int = DEFAULT_BLE_SCAN_TIMEOUT,
+        max_auth_attempts: int = DEFAULT_MAX_AUTH_ATTEMPTS,
+    ) -> None:
+        _patch_missing_bt_device_command()
+        hwi_jade_module_any: Any = hwi_jade_module
+        hwi_jade_module_any.JadeBleImpl = CompatibleJadeBleImpl
+
+        path = f"ble:{device_name}:{serial_number or ''}"
+        HardwareWalletClient.__init__(self, path, password, expert, chain)
+        self.jade: JadeAPI | None = None
+
+        self._ble_loop = asyncio.new_event_loop()
+        preferred_address_token = _PREFERRED_BLE_ADDRESS.set(device_address)
+        try:
+            try:
+                self.jade = JadeAPI.create_ble(
+                    device_name=device_name,
+                    serial_number=serial_number,
+                    scan_timeout=scan_timeout,
+                    loop=self._ble_loop,
+                )
+            finally:
+                _PREFERRED_BLE_ADDRESS.reset(preferred_address_token)
+            self.jade.connect()
+            self._initialize_device(max_auth_attempts=max_auth_attempts)
+        except Exception:
+            self._disconnect_and_close_loop()
+            raise
+
+    def _initialize_device(self, max_auth_attempts: int) -> None:
+        assert self.jade is not None
+
+        verinfo = self.jade.get_version_info()
+        self.fw_version = semver.parse_version_info(verinfo["JADE_VERSION"])
+        uninitialized = verinfo["JADE_STATE"] not in ["READY", "TEMP"]
+
+        if self.MIN_SUPPORTED_FW_VERSION > self.fw_version.finalize_version():
+            raise DeviceNotReadyError(
+                f"Jade fw version: {self.fw_version} - minimum required version: "
+                f"{self.MIN_SUPPORTED_FW_VERSION}. Please update using a Blockstream Green companion app"
+            )
+
+        if uninitialized and not HAS_NETWORKING:
+            raise DeviceNotReadyError(
+                'Use "Recovery Phrase Login" or "QR PIN Unlock" feature on Jade hw to access wallet'
+            )
+
+        self.jade.add_entropy(os.urandom(32))
+
+        failed_attempts = 0
+        while True:
+            try:
+                authenticated = self.jade.auth_user(self._network())
+            except JadeError as e:
+                if e.code == JadeError.USER_CANCELLED:
+                    raise ActionCanceledError(
+                        "Jade connection/authentication was canceled by the user"
+                    ) from e
+                raise
+
+            if authenticated:
+                return
+
+            failed_attempts += 1
+            if failed_attempts >= max_auth_attempts:
+                raise ActionCanceledError("Jade connection/authentication was denied or failed repeatedly")
+
+    def _disconnect_and_close_loop(self) -> None:
+        if self.jade is not None:
+            try:
+                self.jade.disconnect()
+            except Exception:
+                pass
+            finally:
+                self.jade = None
+        if not self._ble_loop.is_closed():
+            self._ble_loop.close()
+
+    def close(self) -> None:
+        self._disconnect_and_close_loop()

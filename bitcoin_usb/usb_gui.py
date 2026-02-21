@@ -1,7 +1,9 @@
+import asyncio
 import logging
 import platform
 import re
 import tempfile
+from collections.abc import Callable
 from functools import partial
 from pathlib import Path
 from typing import Any, cast
@@ -12,19 +14,80 @@ from bitcoin_safe_lib.async_tools.loop_in_thread import LoopInThread
 from bitcoin_safe_lib.gui.qt.signal_tracker import SignalProtocol
 from bitcoin_safe_lib.gui.qt.util import question_dialog
 from bitcoin_safe_lib.util_os import xdg_open_file
+from bleak import BleakClient, BleakScanner
 from hwilib.devices.bitbox02 import Bitbox02Client
+from hwilib.devices.jadepy.jade import DEFAULT_BLE_DEVICE_NAME
 from PyQt6.QtCore import QObject, pyqtSignal
 from PyQt6.QtWidgets import QMessageBox, QPushButton
 
 from bitcoin_usb.address_types import AddressType
-from bitcoin_usb.dialogs import DeviceDialog, ThreadedWaitingDialog, get_message_box
-from bitcoin_usb.hwi_quick import HWIQuick
+from bitcoin_usb.dialogs import DeviceDialog, get_message_box
 from bitcoin_usb.util import run_device_task
 
 from .device import USBDevice, bdknetwork_to_chain
 from .i18n import translate
 
 logger = logging.getLogger(__name__)
+DEFAULT_DISCOVERY_SCAN_TIMEOUT_SECONDS = 6.0
+
+
+def is_ble_available() -> bool:
+    return BleakClient is not None and BleakScanner is not None
+
+
+def can_scan_bluetooth_devices(probe_timeout: float = 0.2) -> bool:
+    if not is_ble_available():
+        return False
+    try:
+        asyncio.run(BleakScanner.discover(timeout=max(0.1, probe_timeout)))
+    except Exception as e:
+        logger.info("Bluetooth scanning unavailable in this environment: %s", e)
+        return False
+    return True
+
+
+def _extract_jade_serial_number(device_name: str) -> str | None:
+    match = re.match(
+        rf"^{re.escape(DEFAULT_BLE_DEVICE_NAME)}(?:[\s_-]+(?P<serial>[A-Za-z0-9]+))?$",
+        device_name,
+    )
+    if not match:
+        return None
+    return match.groupdict().get("serial")
+
+
+def discover_jade_ble_devices(
+    scan_timeout: float = DEFAULT_DISCOVERY_SCAN_TIMEOUT_SECONDS,
+) -> list[dict[str, Any]]:
+    devices = asyncio.run(BleakScanner.discover(timeout=max(1.0, scan_timeout)))
+    discovered: list[dict[str, Any]] = []
+    seen_addresses: set[str] = set()
+
+    for dev in devices:
+        name = (dev.name or "").strip()
+        if not name.startswith(DEFAULT_BLE_DEVICE_NAME):
+            continue
+
+        address = str(dev.address)
+        if address in seen_addresses:
+            continue
+        seen_addresses.add(address)
+
+        discovered.append(
+            {
+                "type": "jade",
+                "model": "jade_ble",
+                "path": f"ble:{address}",
+                "needs_pin_sent": False,
+                "needs_passphrase_sent": False,
+                "transport": "bluetooth",
+                "bluetooth_name": name,
+                "bluetooth_address": address,
+                "bluetooth_serial_number": _extract_jade_serial_number(name),
+            }
+        )
+
+    return discovered
 
 
 def clean_string(input_string: str) -> str:
@@ -58,12 +121,15 @@ class USBGui(QObject):
         autoselect_if_1_device=False,
         initalization_label="",
         parent=None,
+        enable_bluetooth: bool = True,
     ) -> None:
         super().__init__()
         self.autoselect_if_1_device = autoselect_if_1_device
         self.network = network
         self.loop_in_thread = loop_in_thread
         self._parent = parent
+        self.enable_bluetooth = enable_bluetooth
+        self._bluetooth_scan_supported: bool | None = None
         self.initalization_label = clean_string(initalization_label)
         self.allow_emulators_only_for_testnet_works = allow_emulators_only_for_testnet_works
 
@@ -71,73 +137,54 @@ class USBGui(QObject):
         self.initalization_label = clean_string(value)
 
     def get_devices(self, slow_hwi_listing=False) -> list[dict[str, Any]]:
-        "Returns the found devices WITHOUT unlocking them first.  Misses the fingerprints"
-        allow_emulators = False
-        devices: list[dict[str, Any]] = []
-
-        try:
-            if slow_hwi_listing:
-                allow_emulators = True
-                if self.allow_emulators_only_for_testnet_works:
-                    allow_emulators = self.network in [
-                        bdk.Network.REGTEST,
-                        bdk.Network.TESTNET,
-                        bdk.Network.SIGNET,
-                    ]
-
-                devices = ThreadedWaitingDialog(
-                    partial(
-                        hwi_commands.enumerate,
-                        allow_emulators=allow_emulators,
-                        chain=bdknetwork_to_chain(self.network),
-                    ),
-                    title=self.tr("Unlock USB devices"),
-                    message=self.tr("Please unlock USB devices"),
-                ).get_result()
-            else:
-                devices = HWIQuick(network=self.network).enumerate()
-
-        except Exception as e:
-            logger.error(str(e))
-        return devices
+        "Enumerate available HWI devices."
+        allow_emulators = bool(slow_hwi_listing)
+        if allow_emulators:
+            allow_emulators = True
+            if self.allow_emulators_only_for_testnet_works:
+                allow_emulators = self.network in [
+                    bdk.Network.REGTEST,
+                    bdk.Network.TESTNET,
+                    bdk.Network.SIGNET,
+                ]
+        return hwi_commands.enumerate(
+            allow_emulators=allow_emulators, chain=bdknetwork_to_chain(self.network)
+        )
 
     def get_device(self, slow_hwi_listing=False) -> dict[str, Any] | None:
         "Returns the found devices WITHOUT unlocking them first.  Misses the fingerprints"
-        devices = self.get_devices(slow_hwi_listing=slow_hwi_listing)
+        bluetooth_scan_callback: Callable[[], list[dict[str, Any]]] | None = None
+        if self._is_bluetooth_scan_supported():
+            bluetooth_scan_callback = self.get_bluetooth_devices
 
-        if not devices:
-            if platform.system() == "Linux":
-                if (
-                    question_dialog(
-                        text=self.tr("No USB devices found. It could be due to missing udev rules."),
-                        title=self.tr("USB Devices"),
-                        false_button="Install udev rules",
-                        true_button=QMessageBox.StandardButton.Ok,
-                    )
-                    is False
-                ):
-                    self.linux_cmd_install_udev_as_sudo()
-            else:
-                get_message_box(
-                    translate("bitcoin_usb", "No USB devices found"),
-                    title=translate("bitcoin_usb", "USB Devices"),
-                ).exec()
-
-            self.signal_end_hwi_blocker.emit()
-            return None
-        if len(devices) == 1 and self.autoselect_if_1_device:
-            return devices[0]
-        else:
-            dialog = DeviceDialog(self._parent, devices, self.network)
-            if dialog.exec():
-                return dialog.get_selected_device()
-            else:
-                get_message_box(
-                    self.tr("No device selected"),
-                    title=self.tr("USB Devices"),
-                ).exec()
-                self.signal_end_hwi_blocker.emit()
+        dialog = DeviceDialog(
+            self._parent,
+            network=self.network,
+            usb_scan_callback=partial(self.get_devices, slow_hwi_listing=slow_hwi_listing),
+            bluetooth_scan_callback=bluetooth_scan_callback,
+            install_udev_callback=self.linux_cmd_install_udev_as_sudo
+            if platform.system() == "Linux"
+            else None,
+            autoselect_if_1_device=self.autoselect_if_1_device,
+        )
+        if dialog.exec():
+            return dialog.get_selected_device()
+        self.signal_end_hwi_blocker.emit()
         return None
+
+    def get_bluetooth_devices(self) -> list[dict[str, Any]]:
+        if not self.enable_bluetooth:
+            raise RuntimeError(self.tr("Bluetooth support is disabled by configuration."))
+        if not self._is_bluetooth_scan_supported():
+            raise RuntimeError(self.tr("Bluetooth scanning is not available in this environment."))
+        return discover_jade_ble_devices(scan_timeout=6.0)
+
+    def _is_bluetooth_scan_supported(self) -> bool:
+        if not self.enable_bluetooth:
+            return False
+        if self._bluetooth_scan_supported is None:
+            self._bluetooth_scan_supported = can_scan_bluetooth_devices()
+        return self._bluetooth_scan_supported
 
     def sign(self, psbt: bdk.Psbt, slow_hwi_listing=False) -> bdk.Psbt | None:
         selected_device = self.get_device(slow_hwi_listing=slow_hwi_listing)
