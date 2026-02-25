@@ -106,6 +106,24 @@ def _patch_missing_bt_device_command() -> None:
 
 
 class CompatibleJadeBleImpl(BlockstreamJadeBleImpl):
+    """
+    Compatibility wrapper around `jadepy`'s BLE transport.
+
+    Why this class exists:
+    - It allows selecting a specific BLE address (`preferred_ble_address`) so we
+      can connect to the exact Jade found during discovery instead of re-scanning
+      and potentially picking the wrong device.
+    - It preserves behavior on Linux systems without `bt-device` via the
+      `_patch_missing_bt_device_command` shim.
+    - It keeps BLE connection behavior compatible across `bleak` versions
+      (notably disconnection callback handling).
+
+    Where it is used:
+    - `JadeBleClient.__init__` patches `hwilib.devices.jadepy.jade.JadeBleImpl`
+      to this class before calling `JadeAPI.create_ble(...)`.
+    - `JadeAPI.create_ble(...)` then instantiates this class internally.
+    """
+
     def __init__(
         self,
         device_name: str,
@@ -256,6 +274,22 @@ class CompatibleJadeBleImpl(BlockstreamJadeBleImpl):
 
 
 class JadeBleClient(JadeClient):
+    """
+    HWI Jade client variant that connects over Bluetooth LE.
+
+    Why this class exists:
+    - Upstream `JadeClient` expects transport setup from HWI, but this project
+      needs explicit BLE-device selection from GUI discovery results.
+    - It injects `CompatibleJadeBleImpl` so `JadeAPI.create_ble(...)` uses the
+      custom transport behavior defined in this module.
+    - It owns a dedicated asyncio loop for BLE operations and performs the Jade
+      firmware/auth initialization sequence used by the rest of `USBDevice`.
+
+    Where it is used:
+    - `bitcoin_usb/device.py` instantiates `JadeBleClient` when a selected
+      device has `transport == "bluetooth"` and `type == "jade"`.
+    """
+
     def __init__(
         self,
         device_name: str,
