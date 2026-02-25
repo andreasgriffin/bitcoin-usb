@@ -144,17 +144,14 @@ class DeviceDialog(QDialog):
         self._scan_worker: Worker | None = None
         self._has_auto_scanned_on_open = False
         self._has_completed_usb_scan = False
+        self._scan_finished_message = ""
         self.usb_icon = self._load_icon(self._usb_icon_path)
         self.bluetooth_icon = self._load_icon(self._bluetooth_icon_path)
 
         self.instructions_label = QLabel(self)
         self.instructions_label.setWordWrap(True)
         self.instructions_label.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Fixed)
-        self.instructions_label.setText(
-            self.tr(
-                "1. Connect your hardware signer\n2. Click Scan\n3. Unlock the device\n4. Select the device"
-            )
-        )
+        self._set_instructions_message("")
         self._layout.addWidget(self.instructions_label)
 
         self.progress = QProgressBar(self)
@@ -266,6 +263,17 @@ class DeviceDialog(QDialog):
             else:
                 self._update_install_udev_button_visibility()
 
+    def _instructions_base_text(self) -> str:
+        return self.tr(
+            "1. Connect your hardware signer\n2. Click Scan\n3. Unlock the device\n4. Select the device"
+        )
+
+    def _set_instructions_message(self, hint: str) -> None:
+        text = self._instructions_base_text()
+        if hint:
+            text = f"{text}\n\n{hint}"
+        self.instructions_label.setText(text)
+
     def _render_devices(self):
         while self.devices_layout.count():
             item = self.devices_layout.takeAt(0)
@@ -366,6 +374,8 @@ class DeviceDialog(QDialog):
 
     def _on_scan_finished(self):
         self._set_scanning(False)
+        self._set_instructions_message(self._scan_finished_message)
+        self._scan_finished_message = ""
         self.usb_scan_button.setDefault(True)
         self.usb_scan_button.setFocus()
         self._stop_scan(wait_timeout_ms=50)
@@ -419,11 +429,14 @@ class DeviceDialog(QDialog):
             worker.deleteLater()
         thread.deleteLater()
 
-    def _start_scan(self, scan_fn: Callable[[], list[dict[str, Any]]], source: str, message: str) -> None:
+    def _start_scan(
+        self, scan_fn: Callable[[], list[dict[str, Any]]], source: str, message: str, finished_message: str
+    ) -> None:
         if self._scan_thread and self._scan_thread.isRunning():
             return
 
         self._set_scanning(True)
+        self._scan_finished_message = finished_message
         self._scan_worker = Worker(scan_fn)
         self._scan_thread = QThread(self)
         self._scan_worker.moveToThread(self._scan_thread)
@@ -431,23 +444,14 @@ class DeviceDialog(QDialog):
         self._scan_worker.finished.connect(lambda result: self._on_scan_result(source, result))
         self._scan_worker.error.connect(lambda exception: self._on_scan_error(source, exception))
         self._scan_thread.start()
-
-        # Show what to do while scan is in progress, without a dedicated status label.
-        self.instructions_label.setText(
-            self.tr(
-                "1. Connect your hardware signer\n"
-                "2. Click Scan\n"
-                "3. Unlock the device\n"
-                "4. Select the device\n\n"
-                "{hint}"
-            ).format(hint=message)
-        )
+        self._set_instructions_message(message)
 
     def scan_usb_devices(self):
         self._start_scan(
             scan_fn=self.usb_scan_callback,
             source="usb",
             message=self.tr("Unlock your hardware signer"),
+            finished_message="",
         )
 
     def scan_for_bluetooth_devices(self):
@@ -457,6 +461,7 @@ class DeviceDialog(QDialog):
             scan_fn=self.bluetooth_scan_callback,
             source="bluetooth",
             message=self.tr("Scanning for compatible Bluetooth hardware signers."),
+            finished_message="",
         )
 
     def get_selected_device(self) -> dict[str, Any] | None:
