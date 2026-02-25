@@ -5,7 +5,9 @@ import platform
 import re
 import shutil
 import subprocess
-from contextvars import ContextVar
+from collections.abc import Iterator
+from contextlib import contextmanager
+from contextvars import ContextVar, Token
 from typing import Any
 
 import semver
@@ -26,7 +28,20 @@ _IS_BT_DEVICE_PATCHED = False
 _ORIGINAL_JADEPY_SUBPROCESS_RUN = jade_ble_module.subprocess.run
 # Temporary per-call channel to pass a preferred BLE MAC address into the custom
 # BLE transport implementation created inside JadeAPI.create_ble(...).
+# We use ContextVar instead of a class/global mutable field so concurrent
+# connection attempts cannot overwrite each other's preferred address.
 _PREFERRED_BLE_ADDRESS: ContextVar[str | None] = ContextVar("_PREFERRED_BLE_ADDRESS", default=None)
+
+
+@contextmanager
+def _preferred_ble_address(address: str | None) -> Iterator[None]:
+    # set() returns a token representing the previous value for this context.
+    # reset(token) restores that value, which keeps state scoped to this block.
+    token: Token[str | None] = _PREFERRED_BLE_ADDRESS.set(address)
+    try:
+        yield
+    finally:
+        _PREFERRED_BLE_ADDRESS.reset(token)
 
 
 def _extract_jade_serial_number(device_name: str) -> str | None:
@@ -99,7 +114,9 @@ class CompatibleJadeBleImpl(BlockstreamJadeBleImpl):
         loop: asyncio.AbstractEventLoop | None,
     ) -> None:
         super().__init__(device_name, serial_number, scan_timeout, loop=loop)
-        # Snapshot the preferred address from the constructor context once.
+        # JadeAPI.create_ble(...) instantiates this class internally. Reading the
+        # ContextVar here is how we inject a one-off preferred BLE address into
+        # that internal object without changing external library signatures.
         self.preferred_ble_address = _PREFERRED_BLE_ADDRESS.get()
         self.client: Any | None = None
         self.inputstream: Any | None = None
@@ -261,20 +278,17 @@ class JadeBleClient(JadeClient):
 
         # Keep BLE traffic on a dedicated loop so this client can run independently.
         self._ble_loop = asyncio.new_event_loop()
-        # ContextVar.set(...) returns a token so we can always restore the previous value,
-        # even if create_ble/connect fails.
-        preferred_address_token = _PREFERRED_BLE_ADDRESS.set(device_address)
         try:
-            try:
+            # Scope the preferred address override to object construction only.
+            # CompatibleJadeBleImpl.__init__ reads it during create_ble(...), then
+            # the context manager restores the previous value immediately.
+            with _preferred_ble_address(device_address):
                 self.jade = JadeAPI.create_ble(
                     device_name=device_name,
                     serial_number=serial_number,
                     scan_timeout=scan_timeout,
                     loop=self._ble_loop,
                 )
-            finally:
-                # Avoid leaking the preferred address into unrelated BLE client creations.
-                _PREFERRED_BLE_ADDRESS.reset(preferred_address_token)
             self.jade.connect()
             self._initialize_device(max_auth_attempts=max_auth_attempts)
         except Exception:
