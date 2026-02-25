@@ -2,6 +2,7 @@ import asyncio
 import collections
 import os
 import platform
+import re
 import shutil
 import subprocess
 from contextvars import ContextVar
@@ -12,7 +13,7 @@ from bleak import BleakScanner
 from hwilib.common import Chain
 from hwilib.devices.jade import HAS_NETWORKING, JadeClient
 from hwilib.devices.jadepy import jade as hwi_jade_module
-from hwilib.devices.jadepy.jade import DEFAULT_BLE_SCAN_TIMEOUT, JadeAPI
+from hwilib.devices.jadepy.jade import DEFAULT_BLE_DEVICE_NAME, DEFAULT_BLE_SCAN_TIMEOUT, JadeAPI
 from hwilib.devices.jadepy.jade_error import JadeError
 from hwilib.errors import ActionCanceledError, DeviceNotReadyError
 from hwilib.hwwclient import HardwareWalletClient
@@ -20,9 +21,54 @@ from jadepy import jade_ble as jade_ble_module
 from jadepy.jade_ble import JadeBleImpl as BlockstreamJadeBleImpl
 
 DEFAULT_MAX_AUTH_ATTEMPTS = 3
+DEFAULT_DISCOVERY_SCAN_TIMEOUT_SECONDS = 6.0
 _IS_BT_DEVICE_PATCHED = False
 _ORIGINAL_JADEPY_SUBPROCESS_RUN = jade_ble_module.subprocess.run
 _PREFERRED_BLE_ADDRESS: ContextVar[str | None] = ContextVar("_PREFERRED_BLE_ADDRESS", default=None)
+
+
+def _extract_jade_serial_number(device_name: str) -> str | None:
+    match = re.match(
+        rf"^{re.escape(DEFAULT_BLE_DEVICE_NAME)}(?:[\s_-]+(?P<serial>[A-Za-z0-9]+))?$",
+        device_name,
+    )
+    if not match:
+        return None
+    return match.groupdict().get("serial")
+
+
+def discover_jade_ble_devices(
+    scan_timeout: float = DEFAULT_DISCOVERY_SCAN_TIMEOUT_SECONDS,
+) -> list[dict[str, Any]]:
+    devices = asyncio.run(BleakScanner.discover(timeout=max(1.0, scan_timeout)))
+    discovered: list[dict[str, Any]] = []
+    seen_addresses: set[str] = set()
+
+    for dev in devices:
+        name = (dev.name or "").strip()
+        if not name.startswith(DEFAULT_BLE_DEVICE_NAME):
+            continue
+
+        address = str(dev.address)
+        if address in seen_addresses:
+            continue
+        seen_addresses.add(address)
+
+        discovered.append(
+            {
+                "type": "jade",
+                "model": "jade_ble",
+                "path": f"ble:{address}",
+                "needs_pin_sent": False,
+                "needs_passphrase_sent": False,
+                "transport": "bluetooth",
+                "bluetooth_name": name,
+                "bluetooth_address": address,
+                "bluetooth_serial_number": _extract_jade_serial_number(name),
+            }
+        )
+
+    return discovered
 
 
 def _patch_missing_bt_device_command() -> None:

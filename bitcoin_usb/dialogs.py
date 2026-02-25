@@ -281,7 +281,8 @@ class DeviceDialog(QDialog):
                 continue
             widget = item.widget()
             if widget:
-                widget.deleteLater()
+                widget.setHidden(True)
+                widget.setParent(None)
 
         devices = list(self._devices_by_key.values())
         devices.sort(

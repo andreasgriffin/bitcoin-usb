@@ -16,19 +16,18 @@ from bitcoin_safe_lib.gui.qt.util import question_dialog
 from bitcoin_safe_lib.util_os import xdg_open_file
 from bleak import BleakClient, BleakScanner
 from hwilib.devices.bitbox02 import Bitbox02Client
-from hwilib.devices.jadepy.jade import DEFAULT_BLE_DEVICE_NAME
 from PyQt6.QtCore import QObject, pyqtSignal
 from PyQt6.QtWidgets import QMessageBox, QPushButton
 
 from bitcoin_usb.address_types import AddressType
 from bitcoin_usb.dialogs import DeviceDialog, get_message_box
+from bitcoin_usb.jade_ble_client import discover_jade_ble_devices
 from bitcoin_usb.util import run_device_task
 
 from .device import USBDevice, bdknetwork_to_chain
 from .i18n import translate
 
 logger = logging.getLogger(__name__)
-DEFAULT_DISCOVERY_SCAN_TIMEOUT_SECONDS = 6.0
 
 
 def is_ble_available() -> bool:
@@ -44,50 +43,6 @@ def can_scan_bluetooth_devices(probe_timeout: float = 0.2) -> bool:
         logger.info("Bluetooth scanning unavailable in this environment: %s", e)
         return False
     return True
-
-
-def _extract_jade_serial_number(device_name: str) -> str | None:
-    match = re.match(
-        rf"^{re.escape(DEFAULT_BLE_DEVICE_NAME)}(?:[\s_-]+(?P<serial>[A-Za-z0-9]+))?$",
-        device_name,
-    )
-    if not match:
-        return None
-    return match.groupdict().get("serial")
-
-
-def discover_jade_ble_devices(
-    scan_timeout: float = DEFAULT_DISCOVERY_SCAN_TIMEOUT_SECONDS,
-) -> list[dict[str, Any]]:
-    devices = asyncio.run(BleakScanner.discover(timeout=max(1.0, scan_timeout)))
-    discovered: list[dict[str, Any]] = []
-    seen_addresses: set[str] = set()
-
-    for dev in devices:
-        name = (dev.name or "").strip()
-        if not name.startswith(DEFAULT_BLE_DEVICE_NAME):
-            continue
-
-        address = str(dev.address)
-        if address in seen_addresses:
-            continue
-        seen_addresses.add(address)
-
-        discovered.append(
-            {
-                "type": "jade",
-                "model": "jade_ble",
-                "path": f"ble:{address}",
-                "needs_pin_sent": False,
-                "needs_passphrase_sent": False,
-                "transport": "bluetooth",
-                "bluetooth_name": name,
-                "bluetooth_address": address,
-                "bluetooth_serial_number": _extract_jade_serial_number(name),
-            }
-        )
-
-    return discovered
 
 
 def clean_string(input_string: str) -> str:
