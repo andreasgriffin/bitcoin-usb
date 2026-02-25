@@ -24,6 +24,8 @@ DEFAULT_MAX_AUTH_ATTEMPTS = 3
 DEFAULT_DISCOVERY_SCAN_TIMEOUT_SECONDS = 6.0
 _IS_BT_DEVICE_PATCHED = False
 _ORIGINAL_JADEPY_SUBPROCESS_RUN = jade_ble_module.subprocess.run
+# Temporary per-call channel to pass a preferred BLE MAC address into the custom
+# BLE transport implementation created inside JadeAPI.create_ble(...).
 _PREFERRED_BLE_ADDRESS: ContextVar[str | None] = ContextVar("_PREFERRED_BLE_ADDRESS", default=None)
 
 
@@ -77,6 +79,8 @@ def _patch_missing_bt_device_command() -> None:
         return
 
     def _safe_subprocess_run(command: Any, *args: Any, **kwargs: Any):
+        # jadepy tries to run this cleanup command unconditionally on Linux.
+        # Some distros do not ship bt-device, so treat it as a no-op.
         if isinstance(command, str) and command.strip().startswith("bt-device --remove"):
             # bt-device is optional and absent on many Linux distros; skip this cleanup call.
             return subprocess.CompletedProcess(command, 0)
@@ -95,6 +99,7 @@ class CompatibleJadeBleImpl(BlockstreamJadeBleImpl):
         loop: asyncio.AbstractEventLoop | None,
     ) -> None:
         super().__init__(device_name, serial_number, scan_timeout, loop=loop)
+        # Snapshot the preferred address from the constructor context once.
         self.preferred_ble_address = _PREFERRED_BLE_ADDRESS.get()
         self.client: Any | None = None
         self.inputstream: Any | None = None
@@ -104,9 +109,11 @@ class CompatibleJadeBleImpl(BlockstreamJadeBleImpl):
     async def _connect_impl(self) -> None:
         assert self.client is None
 
+        # Incoming notifications are buffered here and consumed by _input_stream().
         inbufs: collections.deque[bytes] = collections.deque()
 
         async def _input_stream():
+            # JadeAPI expects a byte-stream-like async iterator.
             while self.client is not None:
                 while inbufs:
                     buf = inbufs.popleft()
@@ -117,6 +124,7 @@ class CompatibleJadeBleImpl(BlockstreamJadeBleImpl):
 
         self.inputstream = _input_stream()
 
+        # Use the caller-selected BLE address when present; otherwise fall back to scanning.
         device_mac = self.preferred_ble_address
         full_name = self.device_name
         if not device_mac:
@@ -144,6 +152,7 @@ class CompatibleJadeBleImpl(BlockstreamJadeBleImpl):
             )
 
         if platform.system() == "Linux":
+            # Remove stale BlueZ pairing state if present. Missing bt-device is handled by the patch above.
             command = f'bt-device --remove "{device_mac}"'
             jade_ble_module.subprocess.run(command, shell=True, stdout=subprocess.DEVNULL)
 
@@ -158,6 +167,7 @@ class CompatibleJadeBleImpl(BlockstreamJadeBleImpl):
         attempts_remaining = 5
         client = None
         needs_set_disconnection_callback = False
+        # Bleak connect can fail transiently; retry a few times before giving up.
         while not connected:
             try:
                 attempts_remaining -= 1
@@ -191,6 +201,7 @@ class CompatibleJadeBleImpl(BlockstreamJadeBleImpl):
             )
 
         connected_client = client
+        # Probe services/chars/descriptors up front to make sure handles are ready.
         for service in connected_client.services:
             for char in service.characteristics:
                 if char.uuid == BlockstreamJadeBleImpl.IO_RX_CHAR_UUID:
@@ -204,6 +215,7 @@ class CompatibleJadeBleImpl(BlockstreamJadeBleImpl):
                     await connected_client.read_gatt_descriptor(descriptor.handle)
 
         def _notification_handler(sender: Any, data: Any) -> None:
+            # bleak may pass sender either as an int handle or as a characteristic object.
             sender_handle = -1
             if isinstance(sender, int):
                 sender_handle = sender
@@ -240,13 +252,17 @@ class JadeBleClient(JadeClient):
     ) -> None:
         _patch_missing_bt_device_command()
         hwi_jade_module_any: Any = hwi_jade_module
+        # Force HWI's jade module to use our compatible BLE transport implementation.
         hwi_jade_module_any.JadeBleImpl = CompatibleJadeBleImpl
 
         path = f"ble:{device_name}:{serial_number or ''}"
         HardwareWalletClient.__init__(self, path, password, expert, chain)
         self.jade: JadeAPI | None = None
 
+        # Keep BLE traffic on a dedicated loop so this client can run independently.
         self._ble_loop = asyncio.new_event_loop()
+        # ContextVar.set(...) returns a token so we can always restore the previous value,
+        # even if create_ble/connect fails.
         preferred_address_token = _PREFERRED_BLE_ADDRESS.set(device_address)
         try:
             try:
@@ -257,6 +273,7 @@ class JadeBleClient(JadeClient):
                     loop=self._ble_loop,
                 )
             finally:
+                # Avoid leaking the preferred address into unrelated BLE client creations.
                 _PREFERRED_BLE_ADDRESS.reset(preferred_address_token)
             self.jade.connect()
             self._initialize_device(max_auth_attempts=max_auth_attempts)
@@ -267,6 +284,7 @@ class JadeBleClient(JadeClient):
     def _initialize_device(self, max_auth_attempts: int) -> None:
         assert self.jade is not None
 
+        # Validate firmware/version and current wallet state before doing auth.
         verinfo = self.jade.get_version_info()
         self.fw_version = semver.parse_version_info(verinfo["JADE_VERSION"])
         uninitialized = verinfo["JADE_STATE"] not in ["READY", "TEMP"]
@@ -284,6 +302,7 @@ class JadeBleClient(JadeClient):
 
         self.jade.add_entropy(os.urandom(32))
 
+        # Auth may fail/cancel repeatedly; cap retries to avoid infinite loops.
         failed_attempts = 0
         while True:
             try:
@@ -303,6 +322,7 @@ class JadeBleClient(JadeClient):
                 raise ActionCanceledError("Jade connection/authentication was denied or failed repeatedly")
 
     def _disconnect_and_close_loop(self) -> None:
+        # Best-effort shutdown: disconnect device first, then close event loop.
         if self.jade is not None:
             try:
                 self.jade.disconnect()
