@@ -10,8 +10,8 @@ from PyQt6.QtGui import QCloseEvent, QGuiApplication, QIcon, QShowEvent
 from PyQt6.QtWidgets import (
     QApplication,
     QDialog,
+    QDialogButtonBox,
     QGroupBox,
-    QHBoxLayout,
     QLabel,
     QMessageBox,
     QProgressBar,
@@ -167,35 +167,37 @@ class DeviceDialog(QDialog):
         self.devices_layout = QVBoxLayout(self.devices_group)
         self._layout.addWidget(self.devices_group, stretch=1)
 
-        actions_row = QHBoxLayout()
-        self.usb_scan_button = QPushButton(self.tr("Scan USB devices"), self)
+        self.actions_bar = QDialogButtonBox(self)
+        self.usb_scan_button = self.actions_bar.addButton(
+            self.tr("Scan USB devices"), QDialogButtonBox.ButtonRole.ActionRole
+        )
         self.usb_scan_button.setIcon(self.usb_icon)
         self.usb_scan_button.clicked.connect(self.scan_usb_devices)
         self.usb_scan_button.setAutoDefault(True)
         self.usb_scan_button.setDefault(True)
-        actions_row.addWidget(self.usb_scan_button)
 
         self.bluetooth_scan_button: QPushButton | None = None
         if self.bluetooth_scan_callback:
-            self.bluetooth_scan_button = QPushButton(self.tr("Scan Bluetooth devices"), self)
+            self.bluetooth_scan_button = self.actions_bar.addButton(
+                self.tr("Scan Bluetooth devices"), QDialogButtonBox.ButtonRole.ActionRole
+            )
             self.bluetooth_scan_button.setIcon(self.bluetooth_icon)
             self.bluetooth_scan_button.clicked.connect(self.scan_for_bluetooth_devices)
             self.bluetooth_scan_button.setAutoDefault(False)
-            actions_row.addWidget(self.bluetooth_scan_button)
 
         self.install_udev_button: QPushButton | None = None
         if self.install_udev_callback and sys.platform.startswith("linux"):
-            self.install_udev_button = QPushButton(self.tr("Install udev rules"), self)
+            self.install_udev_button = self.actions_bar.addButton(
+                self.tr("Install udev rules"), QDialogButtonBox.ButtonRole.ActionRole
+            )
             self.install_udev_button.clicked.connect(self.install_udev_callback)
             self.install_udev_button.setAutoDefault(False)
             self.install_udev_button.setVisible(False)
-            actions_row.addWidget(self.install_udev_button)
 
-        self.cancel_button = QPushButton(self.tr("Cancel"), self)
-        self.cancel_button.clicked.connect(self.reject)
+        self.cancel_button = self.actions_bar.addButton(QDialogButtonBox.StandardButton.Cancel)
+        self.actions_bar.rejected.connect(self.reject)
         self.cancel_button.setAutoDefault(False)
-        actions_row.addWidget(self.cancel_button)
-        self._layout.addLayout(actions_row)
+        self._layout.addWidget(self.actions_bar)
 
         # ensure the dialog has its “natural” size
         self.adjustSize()
