@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import os
 import subprocess
 import sys
 from collections.abc import Callable
@@ -72,3 +73,15 @@ def run_device_task(loop_in_thread: LoopInThread | None, task: Callable[[], T]) 
         raise caught[0]
 
     return result[0] if result else None
+
+
+def resource_path(*parts: str):
+    # absolute path to python package folder  ("lib")
+    """Resource path."""
+    pkg_dir = os.path.split(os.path.realpath(__file__))[0]
+    return os.path.join(pkg_dir, *parts)
+
+
+def get_icon_path(icon_basename: str) -> str:
+    """Get icon path."""
+    return resource_path("icons", icon_basename)

@@ -11,7 +11,7 @@ disable_error_code = "assignment"
 
 [tool.poetry]
 name = "bitcoin-usb"
-version = "3.0.1"
+version = "4.0.0"
 authors = ["andreasgriffin <andreasgriffin@proton.me>"]
 license = "GPL-3.0"
 readme = "README.md"
@@ -29,10 +29,13 @@ requests = "^2.32.3" # essential for Jade to work
 trezor = "^0.13.9" 
 bitcoin-safe-lib = {  git = "https://github.com/andreasgriffin/bitcoin-safe-lib.git", branch = "main" }  
 cbor2 = "<5.8.0"  # see https://github.com/bitcoin-core/HWI/issues/817
+bleak = "^0.22.3"
+jade-client = {git = "https://github.com/Blockstream/Jade.git", rev = "fb2642397ed7afdda08f3d1380ac6ee21164e7e6"}
+aioitertools = "^0.13.0"  #  needed for jade-client
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^8.2.2"
- 
+
 [build-system]
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
@@ -63,5 +66,3 @@ known-first-party = ["bitcoin_usb"]
 
 [tool.ruff.format]
 # Ruff formatter is Black-compatible; keep defaults or tweak here.
-
-
