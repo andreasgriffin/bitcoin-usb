@@ -24,6 +24,8 @@ from jadepy.jade_ble import JadeBleImpl as BlockstreamJadeBleImpl
 
 DEFAULT_MAX_AUTH_ATTEMPTS = 3
 DEFAULT_DISCOVERY_SCAN_TIMEOUT_SECONDS = 6.0
+DEFAULT_BLE_CONNECT_TIMEOUT_SECONDS = 15.0
+DEFAULT_BLE_GATT_OPERATION_TIMEOUT_SECONDS = 10.0
 _IS_BT_DEVICE_PATCHED = False
 _ORIGINAL_JADEPY_SUBPROCESS_RUN = jade_ble_module.subprocess.run
 # Temporary per-call channel to pass a preferred BLE MAC address into the custom
@@ -140,6 +142,23 @@ class CompatibleJadeBleImpl(BlockstreamJadeBleImpl):
         self.inputstream: Any | None = None
         self.rx_char_handle: int | None = None
         self.write_task: asyncio.Task[Any] | None = None
+        self.connect_timeout_seconds = DEFAULT_BLE_CONNECT_TIMEOUT_SECONDS
+        self.gatt_operation_timeout_seconds = DEFAULT_BLE_GATT_OPERATION_TIMEOUT_SECONDS
+
+    async def _await_ble_operation(
+        self,
+        operation: Any,
+        timeout_seconds: float,
+        operation_name: str,
+    ) -> Any:
+        try:
+            return await asyncio.wait_for(operation, timeout=timeout_seconds)
+        except asyncio.TimeoutError as e:
+            raise JadeError(
+                2,
+                f"BLE operation timed out: {operation_name}",
+                f"Timed out after {timeout_seconds:.1f}s",
+            ) from e
 
     async def _connect_impl(self) -> None:
         assert self.client is None
@@ -168,7 +187,11 @@ class CompatibleJadeBleImpl(BlockstreamJadeBleImpl):
                 scan_time = min(2, self.scan_timeout)
                 self.scan_timeout -= scan_time
 
-                devices = await BleakScanner.discover(timeout=scan_time)
+                devices = await self._await_ble_operation(
+                    BleakScanner.discover(timeout=scan_time),
+                    timeout_seconds=float(scan_time) + self.gatt_operation_timeout_seconds,
+                    operation_name="discover",
+                )
                 for dev in devices:
                     jade_ble_module.logger.debug(f"Seen: {dev.name}")
                     if (
@@ -215,7 +238,11 @@ class CompatibleJadeBleImpl(BlockstreamJadeBleImpl):
                     needs_set_disconnection_callback = True
 
                 jade_ble_module.logger.info(f"Connecting to: {full_name} ({device_mac})")
-                await client.connect()
+                await self._await_ble_operation(
+                    client.connect(),
+                    timeout_seconds=self.connect_timeout_seconds,
+                    operation_name="connect",
+                )
                 connected = client.is_connected
                 jade_ble_module.logger.info(f"Connected: {connected}")
             except Exception as e:
@@ -244,10 +271,18 @@ class CompatibleJadeBleImpl(BlockstreamJadeBleImpl):
                     self.rx_char_handle = char.handle
 
                 if "read" in char.properties:
-                    await connected_client.read_gatt_char(char.uuid)
+                    await self._await_ble_operation(
+                        connected_client.read_gatt_char(char.uuid),
+                        timeout_seconds=self.gatt_operation_timeout_seconds,
+                        operation_name="read_gatt_char",
+                    )
 
                 for descriptor in char.descriptors:
-                    await connected_client.read_gatt_descriptor(descriptor.handle)
+                    await self._await_ble_operation(
+                        connected_client.read_gatt_descriptor(descriptor.handle),
+                        timeout_seconds=self.gatt_operation_timeout_seconds,
+                        operation_name="read_gatt_descriptor",
+                    )
 
         def _notification_handler(sender: Any, data: Any) -> None:
             # bleak may pass sender either as an int handle or as a characteristic object.
@@ -265,12 +300,39 @@ class CompatibleJadeBleImpl(BlockstreamJadeBleImpl):
             inbufs.append(bytes(data))
 
         assert self.rx_char_handle
-        await connected_client.start_notify(self.rx_char_handle, _notification_handler)
+        await self._await_ble_operation(
+            connected_client.start_notify(self.rx_char_handle, _notification_handler),
+            timeout_seconds=self.gatt_operation_timeout_seconds,
+            operation_name="start_notify",
+        )
 
         if needs_set_disconnection_callback:
             connected_client.set_disconnected_callback(_disconnection_handler)
 
         self.client = connected_client
+
+    async def _disconnect_impl(self) -> None:
+        try:
+            if self.client is not None and self.client.is_connected:
+                if self.rx_char_handle:
+                    await self._await_ble_operation(
+                        self.client.stop_notify(self.rx_char_handle),
+                        timeout_seconds=self.gatt_operation_timeout_seconds,
+                        operation_name="stop_notify",
+                    )
+                await self._await_ble_operation(
+                    self.client.disconnect(),
+                    timeout_seconds=self.gatt_operation_timeout_seconds,
+                    operation_name="disconnect",
+                )
+        except Exception as err:
+            jade_ble_module.logger.warning(f"Exception when disconnecting ble: {err}")
+
+        self.rx_char_handle = None
+        self.client = None
+        if self.write_task:
+            self.write_task.cancel()
+            self.write_task = None
 
 
 class JadeBleClient(JadeClient):
