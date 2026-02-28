@@ -4,9 +4,10 @@ import platform
 import re
 import tempfile
 from collections.abc import Callable
+from concurrent.futures import ThreadPoolExecutor
 from functools import partial
 from pathlib import Path
-from typing import Any, cast
+from typing import Any, TypeVar, cast
 
 import bdkpython as bdk
 import hwilib.commands as hwi_commands
@@ -22,10 +23,10 @@ from PyQt6.QtWidgets import QMessageBox, QPushButton
 from bitcoin_usb.address_types import AddressType
 from bitcoin_usb.dialogs import DeviceDialog, get_message_box
 from bitcoin_usb.jade_ble_client import discover_jade_ble_devices
-from bitcoin_usb.util import run_device_task
 
 from .device import USBDevice, bdknetwork_to_chain
 from .i18n import translate
+from .util import run_device_task
 
 logger = logging.getLogger(__name__)
 
@@ -34,11 +35,23 @@ def is_ble_available() -> bool:
     return BleakClient is not None and BleakScanner is not None
 
 
+T = TypeVar("T")
+
+
+def _run_ble_operation(operation: Callable[[], T]) -> T:
+    with ThreadPoolExecutor(max_workers=1, thread_name_prefix="ble") as executor:
+        return executor.submit(operation).result()
+
+
 def can_scan_bluetooth_devices(probe_timeout: float = 0.2) -> bool:
     if not is_ble_available():
         return False
+
+    def _probe_scan() -> list[Any]:
+        return asyncio.run(BleakScanner.discover(timeout=max(0.1, probe_timeout)))
+
     try:
-        asyncio.run(BleakScanner.discover(timeout=max(0.1, probe_timeout)))
+        _run_ble_operation(_probe_scan)
     except Exception as e:
         logger.info("Bluetooth scanning unavailable in this environment: %s", e)
         return False
@@ -132,7 +145,7 @@ class USBGui(QObject):
             raise RuntimeError(self.tr("Bluetooth support is disabled by configuration."))
         if not self._is_bluetooth_scan_supported():
             raise RuntimeError(self.tr("Bluetooth scanning is not available in this environment."))
-        return discover_jade_ble_devices(scan_timeout=6.0)
+        return _run_ble_operation(self._discover_bluetooth_devices)
 
     def _is_bluetooth_scan_supported(self) -> bool:
         if not self.enable_bluetooth:
@@ -141,19 +154,58 @@ class USBGui(QObject):
             self._bluetooth_scan_supported = can_scan_bluetooth_devices()
         return self._bluetooth_scan_supported
 
+    def _discover_bluetooth_devices(self) -> list[dict[str, Any]]:
+        return discover_jade_ble_devices(scan_timeout=6.0)
+
+    @staticmethod
+    def _is_jade_ble_device(selected_device: dict[str, Any]) -> bool:
+        return (
+            str(selected_device.get("type", "")).lower() == "jade"
+            and str(selected_device.get("transport", "")).lower() == "bluetooth"
+        )
+
+    @staticmethod
+    def _is_usb_device(selected_device: dict[str, Any]) -> bool:
+        transport = str(selected_device.get("transport", "usb")).lower()
+        return transport != "bluetooth"
+
+    @staticmethod
+    def _should_run_in_worker(selected_device: dict[str, Any]) -> bool:
+        if USBGui._is_jade_ble_device(selected_device):
+            return True
+        if platform.system() == "Darwin":
+            return False
+        return USBGui._is_usb_device(selected_device)
+
+    def _with_device(self, selected_device: dict[str, Any], operation: Callable[[USBDevice], T]) -> T | None:
+        """
+        Run one hardware-wallet operation with the required threading model.
+
+        - macOS USB: keep calls on the caller/main thread to avoid crashes.
+        - Linux/Windows USB: run calls in a worker thread.
+        - Jade BLE: run calls in a worker thread for stable bleak behavior.
+        """
+
+        def _run_operation() -> T:
+            with USBDevice(
+                selected_device=selected_device,
+                network=self.network,
+                loop_in_thread=self.loop_in_thread,
+                initalization_label=self.initalization_label,
+            ) as device:
+                return operation(device)
+
+        if self._should_run_in_worker(selected_device):
+            return run_device_task(self.loop_in_thread, _run_operation)
+        return _run_operation()
+
     def sign(self, psbt: bdk.Psbt, slow_hwi_listing=False) -> bdk.Psbt | None:
         selected_device = self.get_device(slow_hwi_listing=slow_hwi_listing)
         if not selected_device:
             return None
 
         try:
-            with USBDevice(
-                selected_device=selected_device,
-                network=self.network,
-                loop_in_thread=self.loop_in_thread,
-                initalization_label=self.initalization_label,
-            ) as dev:
-                return run_device_task(loop_in_thread=self.loop_in_thread, task=partial(dev.sign_psbt, psbt))
+            return self._with_device(selected_device, partial(USBDevice.sign_psbt, psbt=psbt))
         except Exception as e:
             if not self.handle_exception_sign(e):
                 raise
@@ -170,17 +222,11 @@ class USBGui(QObject):
             return None
 
         try:
-            with USBDevice(
-                selected_device=selected_device,
-                network=self.network,
-                loop_in_thread=self.loop_in_thread,
-                initalization_label=self.initalization_label,
-            ) as dev:
 
-                def f():
-                    return (selected_device, dev.get_fingerprint(), dev.get_xpubs())
+            def _collect_xpubs(device: USBDevice) -> tuple[dict[str, Any], str, dict[AddressType, str]]:
+                return (selected_device, device.get_fingerprint(), device.get_xpubs())
 
-                return run_device_task(loop_in_thread=self.loop_in_thread, task=f)
+            return self._with_device(selected_device, _collect_xpubs)
         except Exception as e:
             if not self.handle_exception_get_fingerprint_and_xpubs(e):
                 raise
@@ -196,17 +242,11 @@ class USBGui(QObject):
             return None
 
         try:
-            with USBDevice(
-                selected_device=selected_device,
-                network=self.network,
-                loop_in_thread=self.loop_in_thread,
-                initalization_label=self.initalization_label,
-            ) as dev:
 
-                def f():
-                    return (selected_device, dev.get_fingerprint(), dev.get_xpub(key_origin))
+            def _collect_xpub(device: USBDevice) -> tuple[dict[str, Any], str, str]:
+                return (selected_device, device.get_fingerprint(), device.get_xpub(key_origin))
 
-                return run_device_task(loop_in_thread=self.loop_in_thread, task=f)
+            return self._with_device(selected_device, _collect_xpub)
         except Exception as e:
             if not self.handle_exception_get_fingerprint_and_xpubs(e):
                 raise
@@ -220,15 +260,10 @@ class USBGui(QObject):
             return None
 
         try:
-            with USBDevice(
-                selected_device=selected_device,
-                network=self.network,
-                loop_in_thread=self.loop_in_thread,
-                initalization_label=self.initalization_label,
-            ) as dev:
-                return run_device_task(
-                    loop_in_thread=self.loop_in_thread, task=partial(dev.sign_message, message, bip32_path)
-                )
+            return self._with_device(
+                selected_device,
+                partial(USBDevice.sign_message, message=message, bip32_path=bip32_path),
+            )
         except Exception as e:
             if not self.handle_exception_sign_message(e):
                 raise
@@ -242,15 +277,10 @@ class USBGui(QObject):
             return None
 
         try:
-            with USBDevice(
-                selected_device=selected_device,
-                network=self.network,
-                loop_in_thread=self.loop_in_thread,
-                initalization_label=self.initalization_label,
-            ) as dev:
-                return run_device_task(
-                    loop_in_thread=self.loop_in_thread, task=partial(dev.display_address, address_descriptor)
-                )
+            return self._with_device(
+                selected_device,
+                partial(USBDevice.display_address, address_descriptor=address_descriptor),
+            )
         except Exception as e:
             if not self.handle_exception_display_address(e):
                 raise
@@ -264,13 +294,7 @@ class USBGui(QObject):
             return None
 
         try:
-            with USBDevice(
-                selected_device=selected_device,
-                network=self.network,
-                loop_in_thread=self.loop_in_thread,
-                initalization_label=self.initalization_label,
-            ) as dev:
-                return run_device_task(loop_in_thread=self.loop_in_thread, task=dev.wipe_device)
+            return self._with_device(selected_device, USBDevice.wipe_device)
         except Exception as e:
             if not self.handle_exception_wipe(e):
                 raise
@@ -282,24 +306,23 @@ class USBGui(QObject):
         selected_device = self.get_device(slow_hwi_listing=slow_hwi_listing)
         if not selected_device:
             return None
+        if str(selected_device.get("type", "")).lower() != "bitbox02":
+            QMessageBox.information(
+                None,
+                "Not supported",
+                "This is currently only supported for Bitbox02",
+            )
+            self.signal_end_hwi_blocker.emit()
+            return None
 
         try:
-            with USBDevice(
-                selected_device=selected_device,
-                network=self.network,
-                loop_in_thread=self.loop_in_thread,
-                initalization_label=self.initalization_label,
-            ) as dev:
-                if isinstance(dev.client, Bitbox02Client):
-                    return run_device_task(
-                        loop_in_thread=self.loop_in_thread, task=partial(dev.write_down_seed, dev.client)
-                    )
 
-                QMessageBox.information(
-                    None,
-                    "Not supported",
-                    "This is currently only supported for Bitbox02",
-                )
+            def _backup_seed(device: USBDevice) -> bool | None:
+                if not isinstance(device.client, Bitbox02Client):
+                    return None
+                return device.write_down_seed(device.client)
+
+            return self._with_device(selected_device, _backup_seed)
         except Exception as e:
             if not self.handle_exception_write_down_seed(e):
                 raise
@@ -320,15 +343,10 @@ class USBGui(QObject):
             )
 
         try:
-            with USBDevice(
-                selected_device=selected_device,
-                network=self.network,
-                loop_in_thread=self.loop_in_thread,
-                initalization_label=self.initalization_label,
-            ) as dev:
-                return run_device_task(
-                    loop_in_thread=self.loop_in_thread, task=partial(dev.display_address, address_descriptor)
-                )
+            return self._with_device(
+                selected_device,
+                partial(USBDevice.display_address, address_descriptor=address_descriptor),
+            )
         except Exception as e:
             if not self.handle_exception_display_address(e):
                 raise
