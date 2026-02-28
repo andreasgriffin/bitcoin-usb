@@ -16,7 +16,7 @@ from hwilib.devices.jadepy.jade import DEFAULT_BLE_DEVICE_NAME
 from hwilib.devices.trezor import TrezorClient
 from hwilib.hwwclient import HardwareWalletClient
 from hwilib.psbt import PSBT
-from PyQt6.QtCore import QEventLoop, QObject, Qt, QThread, pyqtSignal
+from PyQt6.QtCore import QCoreApplication, QEventLoop, QObject, Qt, QThread, pyqtSignal
 from PyQt6.QtWidgets import (
     QDialog,
     QDialogButtonBox,
@@ -29,7 +29,7 @@ from PyQt6.QtWidgets import (
 from bitcoin_usb.dialogs import Worker
 from bitcoin_usb.i18n import translate
 from bitcoin_usb.jade_ble_client import JadeBleClient
-from bitcoin_usb.util import run_device_task, run_script
+from bitcoin_usb.util import run_script
 
 from .address_types import (
     AddressType,
@@ -350,8 +350,7 @@ class USBDevice(BaseDevice, QObject):
     def __enter__(self):
         self.lock.acquire()
         try:
-            # _init_client is a synchronous function; we just use the common runner
-            run_device_task(loop_in_thread=self.loop_in_thread, task=self._init_client)
+            self._init_client()
             return self
         except Exception:
             self.lock.release()
@@ -374,10 +373,17 @@ class USBDevice(BaseDevice, QObject):
         return self.client.get_master_fingerprint().hex()
 
     def get_xpubs(self) -> dict[AddressType, str]:
-        xpubs = {}
+        xpubs: dict[AddressType, str] = {}
         for address_type in get_all_address_types():
             xpubs[address_type] = self.get_xpub(address_type.key_origin(self.network))
+            self._process_pending_gui_events()
         return xpubs
+
+    @staticmethod
+    def _process_pending_gui_events() -> None:
+        if QCoreApplication.instance() is None:
+            return
+        QCoreApplication.processEvents()
 
     def get_xpub(self, key_origin: str) -> str:
         assert self.client

@@ -10,6 +10,7 @@ from contextlib import contextmanager
 from contextvars import ContextVar, Token
 from typing import Any
 
+import aioitertools
 import semver
 from bleak import BleakScanner
 from hwilib.common import Chain
@@ -26,6 +27,7 @@ DEFAULT_MAX_AUTH_ATTEMPTS = 3
 DEFAULT_DISCOVERY_SCAN_TIMEOUT_SECONDS = 6.0
 DEFAULT_BLE_CONNECT_TIMEOUT_SECONDS = 15.0
 DEFAULT_BLE_GATT_OPERATION_TIMEOUT_SECONDS = 10.0
+DEFAULT_BLE_IO_TIMEOUT_SECONDS = 60.0
 _IS_BT_DEVICE_PATCHED = False
 _ORIGINAL_JADEPY_SUBPROCESS_RUN = jade_ble_module.subprocess.run
 # Temporary per-call channel to pass a preferred BLE MAC address into the custom
@@ -144,6 +146,7 @@ class CompatibleJadeBleImpl(BlockstreamJadeBleImpl):
         self.write_task: asyncio.Task[Any] | None = None
         self.connect_timeout_seconds = DEFAULT_BLE_CONNECT_TIMEOUT_SECONDS
         self.gatt_operation_timeout_seconds = DEFAULT_BLE_GATT_OPERATION_TIMEOUT_SECONDS
+        self.io_timeout_seconds = DEFAULT_BLE_IO_TIMEOUT_SECONDS
 
     async def _await_ble_operation(
         self,
@@ -225,6 +228,7 @@ class CompatibleJadeBleImpl(BlockstreamJadeBleImpl):
         attempts_remaining = 5
         client = None
         needs_set_disconnection_callback = False
+        attempted_windows_unpair = False
         # Bleak connect can fail transiently; retry a few times before giving up.
         while not connected:
             try:
@@ -247,6 +251,15 @@ class CompatibleJadeBleImpl(BlockstreamJadeBleImpl):
                 jade_ble_module.logger.info(f"Connected: {connected}")
             except Exception as e:
                 jade_ble_module.logger.warning(f"BLE connection exception: {e}")
+                if platform.system() == "Windows" and not attempted_windows_unpair:
+                    attempted_windows_unpair = True
+                    unpaired = await self._try_unpair_windows_device(device_mac=device_mac)
+                    if unpaired:
+                        jade_ble_module.logger.info(
+                            "Removed Windows pairing state for %s; retrying BLE connect",
+                            device_mac,
+                        )
+
                 if not attempts_remaining:
                     jade_ble_module.logger.warning("Exhausted retries - BLE connection failed")
                     raise JadeError(
@@ -311,6 +324,26 @@ class CompatibleJadeBleImpl(BlockstreamJadeBleImpl):
 
         self.client = connected_client
 
+    async def _try_unpair_windows_device(self, device_mac: str) -> bool:
+        if platform.system() != "Windows":
+            return False
+        try:
+            unpair_client = jade_ble_module.bleak.BleakClient(device_mac)
+        except Exception as e:
+            jade_ble_module.logger.warning("Unable to prepare Windows BLE unpair client: %s", e)
+            return False
+
+        try:
+            result = await self._await_ble_operation(
+                unpair_client.unpair(),
+                timeout_seconds=self.gatt_operation_timeout_seconds,
+                operation_name="unpair",
+            )
+            return bool(result)
+        except Exception as e:
+            jade_ble_module.logger.warning("Windows BLE unpair failed for %s: %s", device_mac, e)
+            return False
+
     async def _disconnect_impl(self) -> None:
         try:
             if self.client is not None and self.client.is_connected:
@@ -333,6 +366,57 @@ class CompatibleJadeBleImpl(BlockstreamJadeBleImpl):
         if self.write_task:
             self.write_task.cancel()
             self.write_task = None
+
+    async def _write_impl(self, bytes_: bytes) -> int:  # type: ignore
+        assert self.client is not None
+        assert self.write_task is None
+
+        towrite = len(bytes_)
+        written = 0
+
+        async def _write() -> None:
+            if self.client is None:
+                return
+            nonlocal written
+
+            while written < towrite:
+                remaining = towrite - written
+                length = min(remaining, BlockstreamJadeBleImpl.BLE_MAX_WRITE_SIZE)
+                upper_limit = written + length
+                await self.client.write_gatt_char(
+                    BlockstreamJadeBleImpl.IO_TX_CHAR_UUID,
+                    bytearray(bytes_[written:upper_limit]),
+                    response=True,
+                )
+                written = upper_limit
+
+        self.write_task = asyncio.create_task(_write())
+        try:
+            await self._await_ble_operation(
+                self.write_task,
+                timeout_seconds=self.io_timeout_seconds,
+                operation_name="write",
+            )
+        except asyncio.CancelledError:
+            jade_ble_module.logger.warning(
+                "write() task cancelled having written %d of %d bytes", written, towrite
+            )
+        finally:
+            self.write_task = None
+
+        return written
+
+    async def _read_impl(self, n: int) -> bytes:
+        assert self.inputstream is not None
+        return await self._await_ble_operation(
+            self._read_bytes_from_stream(n=n),
+            timeout_seconds=self.io_timeout_seconds,
+            operation_name=f"read({n})",
+        )
+
+    async def _read_bytes_from_stream(self, n: int) -> bytes:
+        assert self.inputstream is not None
+        return bytes([b async for b in aioitertools.islice(self.inputstream, n)])  # type: ignore
 
 
 class JadeBleClient(JadeClient):
