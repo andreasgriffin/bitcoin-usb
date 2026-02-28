@@ -27,7 +27,7 @@ DEFAULT_MAX_AUTH_ATTEMPTS = 3
 DEFAULT_DISCOVERY_SCAN_TIMEOUT_SECONDS = 6.0
 DEFAULT_BLE_CONNECT_TIMEOUT_SECONDS = 15.0
 DEFAULT_BLE_GATT_OPERATION_TIMEOUT_SECONDS = 10.0
-DEFAULT_BLE_IO_TIMEOUT_SECONDS = 60.0
+DEFAULT_BLE_IO_TIMEOUT_SECONDS = 60 * 60  # the user may need lots of time to unlock and confirm a tx
 _IS_BT_DEVICE_PATCHED = False
 _ORIGINAL_JADEPY_SUBPROCESS_RUN = jade_ble_module.subprocess.run
 # Temporary per-call channel to pass a preferred BLE MAC address into the custom
