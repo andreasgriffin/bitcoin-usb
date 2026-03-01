@@ -158,24 +158,16 @@ class USBGui(QObject):
         return discover_jade_ble_devices(scan_timeout=6.0)
 
     @staticmethod
-    def _is_jade_ble_device(selected_device: dict[str, Any]) -> bool:
-        return (
-            str(selected_device.get("type", "")).lower() == "jade"
-            and str(selected_device.get("transport", "")).lower() == "bluetooth"
-        )
-
-    @staticmethod
-    def _is_usb_device(selected_device: dict[str, Any]) -> bool:
-        transport = str(selected_device.get("transport", "usb")).lower()
-        return transport != "bluetooth"
+    def _is_bluetooth_device(selected_device: dict[str, Any]) -> bool:
+        return str(selected_device.get("transport", "")).lower() == "bluetooth"
 
     @staticmethod
     def _should_run_in_worker(selected_device: dict[str, Any]) -> bool:
-        if USBGui._is_jade_ble_device(selected_device):
+        if USBGui._is_bluetooth_device(selected_device):
             return True
         if platform.system() == "Darwin":
             return False
-        return USBGui._is_usb_device(selected_device)
+        return True
 
     def _with_device(self, selected_device: dict[str, Any], operation: Callable[[USBDevice], T]) -> T | None:
         """
