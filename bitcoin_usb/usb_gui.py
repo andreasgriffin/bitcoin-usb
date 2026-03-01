@@ -158,24 +158,19 @@ class USBGui(QObject):
         return discover_jade_ble_devices(scan_timeout=6.0)
 
     @staticmethod
-    def _is_jade_ble_device(selected_device: dict[str, Any]) -> bool:
-        return (
-            str(selected_device.get("type", "")).lower() == "jade"
-            and str(selected_device.get("transport", "")).lower() == "bluetooth"
-        )
-
-    @staticmethod
-    def _is_usb_device(selected_device: dict[str, Any]) -> bool:
-        transport = str(selected_device.get("transport", "usb")).lower()
-        return transport != "bluetooth"
+    def _is_bluetooth_device(selected_device: dict[str, Any]) -> bool:
+        return str(selected_device.get("transport", "")).lower() == "bluetooth"
 
     @staticmethod
     def _should_run_in_worker(selected_device: dict[str, Any]) -> bool:
-        if USBGui._is_jade_ble_device(selected_device):
+        if USBGui._is_bluetooth_device(selected_device):
+            # BLE must run in a worker thread (otherwise it does not work on Windows).
             return True
         if platform.system() == "Darwin":
+            # macOS USB is kept on the caller/main thread to avoid crashes.
             return False
-        return USBGui._is_usb_device(selected_device)
+        # Linux/Windows USB runs in a worker thread.
+        return True
 
     def _with_device(self, selected_device: dict[str, Any], operation: Callable[[USBDevice], T]) -> T | None:
         """
@@ -183,7 +178,7 @@ class USBGui(QObject):
 
         - macOS USB: keep calls on the caller/main thread to avoid crashes.
         - Linux/Windows USB: run calls in a worker thread.
-        - Jade BLE: run calls in a worker thread for stable bleak behavior.
+        - BLE: run calls in a worker thread, otherwise it doesnt work in Windows
         """
 
         def _run_operation() -> T:
