@@ -122,7 +122,7 @@ class USBGui(QObject):
     def get_device(self, slow_hwi_listing=False) -> dict[str, Any] | None:
         "Returns the found devices WITHOUT unlocking them first.  Misses the fingerprints"
         bluetooth_scan_callback: Callable[[], list[dict[str, Any]]] | None = None
-        if self._is_bluetooth_scan_supported():
+        if self.enable_bluetooth:
             bluetooth_scan_callback = self.get_bluetooth_devices
 
         dialog = DeviceDialog(
@@ -143,14 +143,17 @@ class USBGui(QObject):
     def get_bluetooth_devices(self) -> list[dict[str, Any]]:
         if not self.enable_bluetooth:
             raise RuntimeError(self.tr("Bluetooth support is disabled by configuration."))
-        if not self._is_bluetooth_scan_supported():
+        should_retry_probe = platform.system() == "Darwin"
+        if not self._is_bluetooth_scan_supported(force_refresh=should_retry_probe):
+            if should_retry_probe and self._is_bluetooth_scan_supported(force_refresh=True):
+                return _run_ble_operation(self._discover_bluetooth_devices)
             raise RuntimeError(self.tr("Bluetooth scanning is not available in this environment."))
         return _run_ble_operation(self._discover_bluetooth_devices)
 
-    def _is_bluetooth_scan_supported(self) -> bool:
+    def _is_bluetooth_scan_supported(self, force_refresh: bool = False) -> bool:
         if not self.enable_bluetooth:
             return False
-        if self._bluetooth_scan_supported is None:
+        if force_refresh or self._bluetooth_scan_supported is None:
             self._bluetooth_scan_supported = can_scan_bluetooth_devices()
         return self._bluetooth_scan_supported
 
