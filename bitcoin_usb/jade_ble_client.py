@@ -1,5 +1,6 @@
 import asyncio
 import collections
+import logging
 import os
 import platform
 import re
@@ -24,6 +25,8 @@ from hwilib.hwwclient import HardwareWalletClient
 from jadepy import jade_ble as jade_ble_module
 from jadepy.jade_ble import JadeBleImpl as BlockstreamJadeBleImpl
 
+logger = logging.getLogger(__name__)
+
 DEFAULT_MAX_AUTH_ATTEMPTS = 3
 DEFAULT_DISCOVERY_SCAN_TIMEOUT_SECONDS = 6.0
 DEFAULT_BLE_CONNECT_TIMEOUT_SECONDS = 15.0
@@ -36,6 +39,40 @@ _ORIGINAL_JADEPY_SUBPROCESS_RUN = jade_ble_module.subprocess.run
 # We use ContextVar instead of a class/global mutable field so concurrent
 # connection attempts cannot overwrite each other's preferred address.
 _PREFERRED_BLE_ADDRESS: ContextVar[str | None] = ContextVar("_PREFERRED_BLE_ADDRESS", default=None)
+
+
+class _SafeBleakCallbackLoop:
+    def __init__(self, loop: asyncio.AbstractEventLoop) -> None:
+        self._loop = loop
+
+    def create_future(self) -> asyncio.Future[Any]:
+        return self._loop.create_future()
+
+    def call_soon_threadsafe(self, callback: Any, *args: Any) -> Any:
+        if self._loop.is_closed():
+            logger.debug("Ignoring late CoreBluetooth callback on closed event loop")
+            return None
+        try:
+            return self._loop.call_soon_threadsafe(callback, *args)
+        except RuntimeError as e:
+            if str(e) != "Event loop is closed":
+                raise
+            logger.debug("Ignoring late CoreBluetooth callback after event loop shutdown")
+            return None
+
+
+def _protect_corebluetooth_manager_loop(manager: Any) -> None:
+    event_loop = manager.event_loop
+    if isinstance(event_loop, _SafeBleakCallbackLoop):
+        return
+    manager.event_loop = _SafeBleakCallbackLoop(event_loop)
+
+
+def _protect_corebluetooth_peripheral_delegate_loop(delegate: Any) -> None:
+    event_loop = delegate._event_loop
+    if isinstance(event_loop, _SafeBleakCallbackLoop):
+        return
+    delegate._event_loop = _SafeBleakCallbackLoop(event_loop)
 
 
 @contextmanager
@@ -59,11 +96,57 @@ def _extract_jade_serial_number(device_name: str) -> str | None:
     return match.groupdict().get("serial")
 
 
+def _protect_corebluetooth_callback_loop(scanner: BleakScanner) -> None:
+    if platform.system() != "Darwin":
+        return
+    backend: Any = scanner._backend
+    _protect_corebluetooth_manager_loop(backend._manager)
+
+
+def _protect_corebluetooth_client_callback_loops(client: Any) -> None:
+    if platform.system() != "Darwin":
+        return
+    try:
+        backend = client._backend
+    except AttributeError:
+        return
+
+    try:
+        manager = backend._central_manager_delegate
+    except AttributeError:
+        manager = None
+    if manager is not None:
+        _protect_corebluetooth_manager_loop(manager)
+
+    try:
+        delegate = backend._delegate
+    except AttributeError:
+        delegate = None
+    if delegate is not None:
+        _protect_corebluetooth_peripheral_delegate_loop(delegate)
+
+
+async def _discover_ble_devices_async(scan_timeout: float) -> list[Any]:
+    scanner = BleakScanner()
+    _protect_corebluetooth_callback_loop(scanner)
+    async with scanner:
+        await asyncio.sleep(max(0.1, scan_timeout))
+    return scanner.discovered_devices
+
+
+async def _scan_ble_devices_async(scan_timeout: float) -> list[Any]:
+    return await _discover_ble_devices_async(scan_timeout=scan_timeout)
+
+
+def scan_ble_devices(loop_in_thread: LoopInThread, scan_timeout: float) -> list[Any]:
+    return loop_in_thread.run_foreground(_scan_ble_devices_async(scan_timeout=scan_timeout))
+
+
 def discover_jade_ble_devices(
     loop_in_thread: LoopInThread,
     scan_timeout: float = DEFAULT_DISCOVERY_SCAN_TIMEOUT_SECONDS,
 ) -> list[dict[str, Any]]:
-    devices = loop_in_thread.run_foreground(BleakScanner.discover(timeout=max(1.0, scan_timeout)))
+    devices = scan_ble_devices(loop_in_thread, scan_timeout=max(1.0, scan_timeout))
     discovered: list[dict[str, Any]] = []
     seen_addresses: set[str] = set()
 
@@ -193,7 +276,7 @@ class CompatibleJadeBleImpl(BlockstreamJadeBleImpl):
                 self.scan_timeout -= scan_time
 
                 devices = await self._await_ble_operation(
-                    BleakScanner.discover(timeout=scan_time),
+                    _discover_ble_devices_async(scan_timeout=scan_time),
                     timeout_seconds=float(scan_time) + self.gatt_operation_timeout_seconds,
                     operation_name="discover",
                 )
@@ -237,18 +320,22 @@ class CompatibleJadeBleImpl(BlockstreamJadeBleImpl):
                 attempts_remaining -= 1
                 try:
                     client = jade_ble_module.bleak.BleakClient(
-                        device_mac, disconnected_callback=_disconnection_handler
+                        device_mac,
+                        disconnected_callback=_disconnection_handler,
                     )
                 except TypeError:
                     client = jade_ble_module.bleak.BleakClient(device_mac)
                     needs_set_disconnection_callback = True
 
                 jade_ble_module.logger.info(f"Connecting to: {full_name} ({device_mac})")
-                await self._await_ble_operation(
-                    client.connect(),
-                    timeout_seconds=self.connect_timeout_seconds,
-                    operation_name="connect",
-                )
+                try:
+                    await self._await_ble_operation(
+                        client.connect(),
+                        timeout_seconds=self.connect_timeout_seconds,
+                        operation_name="connect",
+                    )
+                finally:
+                    _protect_corebluetooth_client_callback_loops(client)
                 connected = client.is_connected
                 jade_ble_module.logger.info(f"Connected: {connected}")
             except Exception as e:
