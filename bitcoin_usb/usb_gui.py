@@ -20,7 +20,7 @@ from PyQt6.QtWidgets import QMessageBox, QPushButton
 
 from bitcoin_usb.address_types import AddressType
 from bitcoin_usb.dialogs import DeviceDialog, get_message_box
-from bitcoin_usb.jade_ble_client import discover_jade_ble_devices
+from bitcoin_usb.jade_ble_client import discover_jade_ble_devices, scan_ble_devices
 
 from .device import USBDevice, bdknetwork_to_chain
 from .i18n import translate
@@ -41,7 +41,7 @@ def can_scan_bluetooth_devices(loop_in_thread: LoopInThread, probe_timeout: floa
         return False
 
     try:
-        loop_in_thread.run_foreground(BleakScanner.discover(timeout=max(0.1, probe_timeout)))
+        scan_ble_devices(loop_in_thread, scan_timeout=max(0.1, probe_timeout))
     except Exception as e:
         logger.info("Bluetooth scanning unavailable in this environment: %s", e)
         return False
