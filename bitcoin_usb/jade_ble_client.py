@@ -12,6 +12,7 @@ from typing import Any
 
 import aioitertools
 import semver
+from bitcoin_safe_lib.async_tools.loop_in_thread import LoopInThread
 from bleak import BleakScanner
 from hwilib.common import Chain
 from hwilib.devices.jade import HAS_NETWORKING, JadeClient
@@ -59,9 +60,10 @@ def _extract_jade_serial_number(device_name: str) -> str | None:
 
 
 def discover_jade_ble_devices(
+    loop_in_thread: LoopInThread,
     scan_timeout: float = DEFAULT_DISCOVERY_SCAN_TIMEOUT_SECONDS,
 ) -> list[dict[str, Any]]:
-    devices = asyncio.run(BleakScanner.discover(timeout=max(1.0, scan_timeout)))
+    devices = loop_in_thread.run_foreground(BleakScanner.discover(timeout=max(1.0, scan_timeout)))
     discovered: list[dict[str, Any]] = []
     seen_addresses: set[str] = set()
 

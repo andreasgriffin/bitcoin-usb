@@ -1,10 +1,8 @@
-import asyncio
 import logging
 import platform
 import re
 import tempfile
 from collections.abc import Callable
-from concurrent.futures import ThreadPoolExecutor
 from functools import partial
 from pathlib import Path
 from typing import Any, TypeVar, cast
@@ -38,20 +36,12 @@ def is_ble_available() -> bool:
 T = TypeVar("T")
 
 
-def _run_ble_operation(operation: Callable[[], T]) -> T:
-    with ThreadPoolExecutor(max_workers=1, thread_name_prefix="ble") as executor:
-        return executor.submit(operation).result()
-
-
-def can_scan_bluetooth_devices(probe_timeout: float = 0.2) -> bool:
+def can_scan_bluetooth_devices(loop_in_thread: LoopInThread, probe_timeout: float = 0.2) -> bool:
     if not is_ble_available():
         return False
 
-    def _probe_scan() -> list[Any]:
-        return asyncio.run(BleakScanner.discover(timeout=max(0.1, probe_timeout)))
-
     try:
-        _run_ble_operation(_probe_scan)
+        loop_in_thread.run_foreground(BleakScanner.discover(timeout=max(0.1, probe_timeout)))
     except Exception as e:
         logger.info("Bluetooth scanning unavailable in this environment: %s", e)
         return False
@@ -146,19 +136,19 @@ class USBGui(QObject):
         should_retry_probe = platform.system() == "Darwin"
         if not self._is_bluetooth_scan_supported(force_refresh=should_retry_probe):
             if should_retry_probe and self._is_bluetooth_scan_supported(force_refresh=True):
-                return _run_ble_operation(self._discover_bluetooth_devices)
+                return self._discover_bluetooth_devices()
             raise RuntimeError(self.tr("Bluetooth scanning is not available in this environment."))
-        return _run_ble_operation(self._discover_bluetooth_devices)
+        return self._discover_bluetooth_devices()
 
     def _is_bluetooth_scan_supported(self, force_refresh: bool = False) -> bool:
         if not self.enable_bluetooth:
             return False
         if force_refresh or self._bluetooth_scan_supported is None:
-            self._bluetooth_scan_supported = can_scan_bluetooth_devices()
+            self._bluetooth_scan_supported = can_scan_bluetooth_devices(self.loop_in_thread)
         return self._bluetooth_scan_supported
 
     def _discover_bluetooth_devices(self) -> list[dict[str, Any]]:
-        return discover_jade_ble_devices(scan_timeout=6.0)
+        return discover_jade_ble_devices(self.loop_in_thread, scan_timeout=6.0)
 
     @staticmethod
     def _is_bluetooth_device(selected_device: dict[str, Any]) -> bool:
