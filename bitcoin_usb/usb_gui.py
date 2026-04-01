@@ -370,6 +370,9 @@ class USBGui(QObject):
         return True
 
     def show_error_message(self, text: str) -> None:
+        if "temporary wallet associated with different connection" in text:
+            text += "\n" + self.tr("Please try disconnecting and reconnecting the device")
+
         if platform.system() == "Linux":
             self.show_error_message_linux(text)
         else:

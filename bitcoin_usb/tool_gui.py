@@ -1,5 +1,4 @@
 import platform
-from functools import partial
 
 import bdkpython as bdk
 from bitcoin_safe_lib.async_tools.loop_in_thread import LoopInThread
@@ -153,14 +152,15 @@ class ToolGui(QMainWindow):
 
         # Initialize the network selection
 
-        self.combo_network.currentIndexChanged.connect(
-            partial(self.usb.set_network, bdk.Network[self.combo_network.currentText()])
-        )
+        self.combo_network.currentIndexChanged.connect(self.set_network)
 
         self.shortcut_close = QShortcut(QKeySequence("Ctrl+W"), self)
         self.shortcut_close.activated.connect(self.close)
         self.shortcut_close2 = QShortcut(QKeySequence("ESC"), self)
         self.shortcut_close2.activated.connect(self.close)
+
+    def set_network(self):
+        self.usb.set_network(self.combo_network.currentData())
 
     def install_udev(self):
         self.usb.linux_cmd_install_udev_as_sudo()
