@@ -29,6 +29,7 @@ from PyQt6.QtWidgets import (
 from bitcoin_usb.dialogs import Worker
 from bitcoin_usb.i18n import translate
 from bitcoin_usb.jade_ble_client import JadeBleClient
+from bitcoin_usb.trezor_thp import TrezorThpClient, is_trezor_modern_device
 from bitcoin_usb.util import run_script
 
 from .address_types import (
@@ -296,6 +297,11 @@ class USBDevice(BaseDevice, QObject):
                 device_address=self.selected_device.get("bluetooth_address"),
                 chain=bdknetwork_to_chain(self.network),
             )
+        elif is_trezor_modern_device(self.selected_device):
+            self.client = TrezorThpClient(
+                path=self.selected_device["path"],
+                chain=bdknetwork_to_chain(self.network),
+            )
         else:
             self.client = hwi_commands.get_client(
                 device_type=self.selected_device["type"],
@@ -305,12 +311,20 @@ class USBDevice(BaseDevice, QObject):
 
         if isinstance(self.client, TrezorClient):
             self.client.client.refresh_features()
+            trezor_features = self.client.client.features
+        elif isinstance(self.client, TrezorThpClient):
+            self.client.refresh_features()
+            trezor_features = self.client.features
+        else:
+            trezor_features = None
+
+        if trezor_features is not None:
             filepath = Path(__file__).parent / "device_scripts" / "trezor_firmware.py"
             if not filepath.exists():
                 logger.error(
                     f"{filepath} could not be found. This file is necessary for initialization of trezor without prior firmware."
                 )
-            if self.client.client.features.bootloader_mode:
+            if trezor_features.bootloader_mode:
                 if not filepath.exists():
                     raise Exception(
                         f"{filepath} could not be found. This file is necessary for initialization of trezor without prior firmware."
@@ -321,7 +335,7 @@ class USBDevice(BaseDevice, QObject):
                 # So do not raise an exception
                 logger.error(f"{filepath} returned {error=}")
 
-            if not self.client.client.features.initialized:
+            if self.client and not trezor_features.initialized:
                 if question_dialog(
                     text=self.tr("Do you want to restore an existing seed onto the device?"),
                     buttons=QMessageBox.StandardButton.No | QMessageBox.StandardButton.Yes,

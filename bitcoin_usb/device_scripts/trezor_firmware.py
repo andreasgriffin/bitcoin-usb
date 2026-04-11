@@ -22,9 +22,7 @@ path = args.path
 sys.argv = sys.argv[:1]
 
 
-connection = trezorlib.cli.TrezorConnection(
-    path=path, session_id=None, passphrase_on_host=False, script=False
-)
+connection = trezorlib.cli.TrezorConnection(path=path, script=False)
 
 
 trezorlib.cli.firmware.update(obj=connection)
