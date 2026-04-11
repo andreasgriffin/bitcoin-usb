@@ -21,12 +21,31 @@ from PyQt6.QtWidgets import QMessageBox, QPushButton
 from bitcoin_usb.address_types import AddressType
 from bitcoin_usb.dialogs import DeviceDialog, get_message_box
 from bitcoin_usb.jade_ble_client import discover_jade_ble_devices, scan_ble_devices
+from bitcoin_usb.trezor_thp import enumerate_trezor_thp_devices, is_trezor_modern_device
 
 from .device import USBDevice, bdknetwork_to_chain
 from .i18n import translate
 from .util import run_device_task
 
 logger = logging.getLogger(__name__)
+MODERN_TREZOR_USE_WORKER_THREAD = True
+
+
+def _merge_devices(devices: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    merged: dict[tuple[str, str, str], dict[str, Any]] = {}
+    for device in devices:
+        key = (
+            str(device.get("type", "")),
+            str(device.get("path", "")),
+            str(device.get("transport", "usb")),
+        )
+        merged[key] = device
+    return list(merged.values())
+
+
+def enumerate_available_devices(allow_emulators: bool, chain) -> list[dict[str, Any]]:
+    devices = hwi_commands.enumerate(allow_emulators=allow_emulators, chain=chain)
+    return _merge_devices(devices + enumerate_trezor_thp_devices())
 
 
 def is_ble_available() -> bool:
@@ -105,8 +124,9 @@ class USBGui(QObject):
                     bdk.Network.TESTNET,
                     bdk.Network.SIGNET,
                 ]
-        return hwi_commands.enumerate(
-            allow_emulators=allow_emulators, chain=bdknetwork_to_chain(self.network)
+        return enumerate_available_devices(
+            allow_emulators=allow_emulators,
+            chain=bdknetwork_to_chain(self.network),
         )
 
     def get_device(self, slow_hwi_listing=False) -> dict[str, Any] | None:
@@ -148,7 +168,7 @@ class USBGui(QObject):
         return self._bluetooth_scan_supported
 
     def _discover_bluetooth_devices(self) -> list[dict[str, Any]]:
-        return discover_jade_ble_devices(self.loop_in_thread, scan_timeout=6.0)
+        return discover_jade_ble_devices(loop_in_thread=self.loop_in_thread, scan_timeout=6.0)
 
     @staticmethod
     def _is_bluetooth_device(selected_device: dict[str, Any]) -> bool:
@@ -156,8 +176,10 @@ class USBGui(QObject):
 
     @staticmethod
     def _should_run_in_worker(selected_device: dict[str, Any]) -> bool:
+        if is_trezor_modern_device(selected_device):
+            return MODERN_TREZOR_USE_WORKER_THREAD
         if USBGui._is_bluetooth_device(selected_device):
-            # BLE must run in a worker thread (otherwise it does not work on Windows).
+            # Non-Trezor BLE devices must run in a worker thread (otherwise Jade breaks on Windows).
             return True
         if platform.system() == "Darwin":
             # macOS USB is kept on the caller/main thread to avoid crashes.
@@ -171,7 +193,8 @@ class USBGui(QObject):
 
         - macOS USB: keep calls on the caller/main thread to avoid crashes.
         - Linux/Windows USB: run calls in a worker thread.
-        - BLE: run calls in a worker thread, otherwise it doesnt work in Windows
+        - Jade BLE: run calls in a worker thread, otherwise it breaks on Windows.
+        - Trezor Safe 7 THP/v1: controlled by `MODERN_TREZOR_USE_WORKER_THREAD`.
         """
 
         def _run_operation() -> T:

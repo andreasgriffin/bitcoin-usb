@@ -32,7 +32,8 @@ def test_can_scan_bluetooth_devices_returns_false_on_probe_exception(monkeypatch
 
     monkeypatch.setattr(usb_gui, "scan_ble_devices", fail_scan_ble_devices)
 
-    assert usb_gui.can_scan_bluetooth_devices(object()) is False
+    loop_in_thread = object()
+    assert usb_gui.can_scan_bluetooth_devices(loop_in_thread=loop_in_thread) is False
 
 
 def test_get_bluetooth_devices_retries_support_probe_on_macos(monkeypatch) -> None:

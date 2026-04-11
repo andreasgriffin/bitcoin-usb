@@ -150,6 +150,32 @@ class DeviceDialog(QDialog):
 
         # Scan starts automatically when the dialog is shown.
 
+    def _refresh_dialog_size(self) -> None:
+        self._layout.activate()
+        target_size = self.sizeHint().expandedTo(self.minimumSizeHint())
+        self.resize(target_size)
+        self.updateGeometry()
+
+    def _set_default_action_button(self, button: QPushButton | None) -> None:
+        device_buttons: list[QPushButton] = []
+        for index in range(self.devices_layout.count()):
+            if (item := self.devices_layout.itemAt(index)) and isinstance(
+                widget := item.widget(), QPushButton
+            ):
+                device_buttons.append(widget)
+
+        for candidate in (
+            self.usb_scan_button,
+            self.bluetooth_scan_button,
+            self.install_udev_button,
+            self.cancel_button,
+            *device_buttons,
+        ):
+            if candidate:
+                candidate.setDefault(candidate is button)
+        if button:
+            button.setFocus()
+
     def select_device(self, device: dict[str, Any]):
         self.selected_device = device
         self.accept()
@@ -241,12 +267,21 @@ class DeviceDialog(QDialog):
             self.devices_layout.addWidget(empty_label)
             return
 
+        first_button: QPushButton | None = None
         for device in devices:
             button = QPushButton(self._button_text(device), self)
             button.setIcon(self._transport_icon(str(device.get("transport", "usb"))))
             button.clicked.connect(partial(self.select_device, device))
-            button.setAutoDefault(False)
+            button.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+            button.setMinimumHeight(button.sizeHint().height())
+            button.setAutoDefault(True)
+            if first_button is None:
+                first_button = button
+                button.setDefault(True)
             self.devices_layout.addWidget(button)
+
+        if first_button:
+            first_button.setFocus()
 
     def _replace_devices_for_transport(self, transport: str, devices: list[dict[str, Any]]) -> None:
         self._devices_by_key = {
@@ -292,6 +327,7 @@ class DeviceDialog(QDialog):
             self._has_completed_usb_scan = True
             self._update_install_udev_button_visibility()
         self._render_devices()
+        self._refresh_dialog_size()
 
         total = len(self._devices_by_key)
         if total and self.autoselect_if_1_device and total == 1:
@@ -317,8 +353,13 @@ class DeviceDialog(QDialog):
         self._set_scanning(False)
         self._set_instructions_message(self._scan_finished_message)
         self._scan_finished_message = ""
-        self.usb_scan_button.setDefault(True)
-        self.usb_scan_button.setFocus()
+        if self._devices_by_key:
+            if (item := self.devices_layout.itemAt(0)) and isinstance(
+                device_button := item.widget(), QPushButton
+            ):
+                self._set_default_action_button(device_button)
+        else:
+            self._set_default_action_button(self.usb_scan_button)
         self._stop_scan(wait_timeout_ms=50)
 
     @classmethod
