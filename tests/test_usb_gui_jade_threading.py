@@ -9,7 +9,7 @@ def test_get_fingerprint_and_xpubs_uses_worker_task_for_jade_ble(monkeypatch) ->
     selected_device = {"type": "jade", "transport": "bluetooth", "path": "ble:aa"}
     calls: dict[str, object] = {"run_task": False}
 
-    monkeypatch.setattr(gui, "get_device", lambda slow_hwi_listing=False: selected_device)
+    monkeypatch.setattr(gui, "get_device", lambda: selected_device)
 
     class _FakeDevice:
         def get_fingerprint(self) -> str:
@@ -50,8 +50,7 @@ def test_get_fingerprint_and_xpubs_uses_worker_task_for_usb_on_linux(monkeypatch
     selected_device = {"type": "trezor", "path": "usb:1"}
     calls: dict[str, object] = {"run_task": False}
 
-    def fake_get_device(slow_hwi_listing=False):
-        _ = slow_hwi_listing
+    def fake_get_device():
         return selected_device
 
     monkeypatch.setattr(gui, "get_device", fake_get_device)
@@ -95,8 +94,7 @@ def test_get_fingerprint_and_xpubs_runs_inline_for_usb_on_macos(monkeypatch) -> 
     gui = USBGui(network=bdk.Network.REGTEST, loop_in_thread=object())
     selected_device = {"type": "trezor", "path": "usb:1"}
 
-    def fake_get_device(slow_hwi_listing=False):
-        _ = slow_hwi_listing
+    def fake_get_device():
         return selected_device
 
     monkeypatch.setattr(gui, "get_device", fake_get_device)

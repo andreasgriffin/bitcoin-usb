@@ -113,23 +113,21 @@ class USBGui(QObject):
     def set_initalization_label(self, value: str):
         self.initalization_label = clean_string(value)
 
-    def get_devices(self, slow_hwi_listing=False) -> list[dict[str, Any]]:
+    def get_devices(self) -> list[dict[str, Any]]:
         "Enumerate available HWI devices."
-        allow_emulators = bool(slow_hwi_listing)
-        if allow_emulators:
-            allow_emulators = True
-            if self.allow_emulators_only_for_testnet_works:
-                allow_emulators = self.network in [
-                    bdk.Network.REGTEST,
-                    bdk.Network.TESTNET,
-                    bdk.Network.SIGNET,
-                ]
+        allow_emulators = True
+        if self.allow_emulators_only_for_testnet_works:
+            allow_emulators = self.network in [
+                bdk.Network.REGTEST,
+                bdk.Network.TESTNET,
+                bdk.Network.SIGNET,
+            ]
         return enumerate_available_devices(
             allow_emulators=allow_emulators,
             chain=bdknetwork_to_chain(self.network),
         )
 
-    def get_device(self, slow_hwi_listing=False) -> dict[str, Any] | None:
+    def get_device(self) -> dict[str, Any] | None:
         "Returns the found devices WITHOUT unlocking them first.  Misses the fingerprints"
         bluetooth_scan_callback: Callable[[], list[dict[str, Any]]] | None = None
         if self.enable_bluetooth:
@@ -138,7 +136,7 @@ class USBGui(QObject):
         dialog = DeviceDialog(
             self._parent,
             network=self.network,
-            usb_scan_callback=partial(self.get_devices, slow_hwi_listing=slow_hwi_listing),
+            usb_scan_callback=self.get_devices,
             bluetooth_scan_callback=bluetooth_scan_callback,
             install_udev_callback=self.linux_cmd_install_udev_as_sudo
             if platform.system() == "Linux"
@@ -210,8 +208,8 @@ class USBGui(QObject):
             return run_device_task(self.loop_in_thread, _run_operation)
         return _run_operation()
 
-    def sign(self, psbt: bdk.Psbt, slow_hwi_listing=False) -> bdk.Psbt | None:
-        selected_device = self.get_device(slow_hwi_listing=slow_hwi_listing)
+    def sign(self, psbt: bdk.Psbt) -> bdk.Psbt | None:
+        selected_device = self.get_device()
         if not selected_device:
             return None
 
@@ -225,10 +223,8 @@ class USBGui(QObject):
 
         return None
 
-    def get_fingerprint_and_xpubs(
-        self, slow_hwi_listing=False
-    ) -> tuple[dict[str, Any], str, dict[AddressType, str]] | None:
-        selected_device = self.get_device(slow_hwi_listing=slow_hwi_listing)
+    def get_fingerprint_and_xpubs(self) -> tuple[dict[str, Any], str, dict[AddressType, str]] | None:
+        selected_device = self.get_device()
         if not selected_device:
             return None
 
@@ -245,10 +241,8 @@ class USBGui(QObject):
             self.signal_end_hwi_blocker.emit()
         return None
 
-    def get_fingerprint_and_xpub(
-        self, key_origin: str, slow_hwi_listing=False
-    ) -> tuple[dict[str, Any], str, str] | None:
-        selected_device = self.get_device(slow_hwi_listing=slow_hwi_listing)
+    def get_fingerprint_and_xpub(self, key_origin: str) -> tuple[dict[str, Any], str, str] | None:
+        selected_device = self.get_device()
         if not selected_device:
             return None
 
@@ -265,8 +259,8 @@ class USBGui(QObject):
             self.signal_end_hwi_blocker.emit()
         return None
 
-    def sign_message(self, message: str, bip32_path: str, slow_hwi_listing=False) -> str | None:
-        selected_device = self.get_device(slow_hwi_listing=slow_hwi_listing)
+    def sign_message(self, message: str, bip32_path: str) -> str | None:
+        selected_device = self.get_device()
         if not selected_device:
             return None
 
@@ -282,8 +276,8 @@ class USBGui(QObject):
             self.signal_end_hwi_blocker.emit()
         return None
 
-    def display_address(self, address_descriptor: str, slow_hwi_listing=False) -> str | None:
-        selected_device = self.get_device(slow_hwi_listing=slow_hwi_listing)
+    def display_address(self, address_descriptor: str) -> str | None:
+        selected_device = self.get_device()
         if not selected_device:
             return None
 
@@ -299,8 +293,8 @@ class USBGui(QObject):
             self.signal_end_hwi_blocker.emit()
         return None
 
-    def wipe_device(self, slow_hwi_listing=False) -> bool | None:
-        selected_device = self.get_device(slow_hwi_listing=slow_hwi_listing)
+    def wipe_device(self) -> bool | None:
+        selected_device = self.get_device()
         if not selected_device:
             return None
 
@@ -313,8 +307,8 @@ class USBGui(QObject):
             self.signal_end_hwi_blocker.emit()
         return None
 
-    def write_down_seed(self, slow_hwi_listing=False) -> bool | None:
-        selected_device = self.get_device(slow_hwi_listing=slow_hwi_listing)
+    def write_down_seed(self) -> bool | None:
+        selected_device = self.get_device()
         if not selected_device:
             return None
         if str(selected_device.get("type", "")).lower() != "bitbox02":
@@ -341,8 +335,8 @@ class USBGui(QObject):
             self.signal_end_hwi_blocker.emit()
         return None
 
-    def register_multisig(self, address_descriptor: str, slow_hwi_listing=False) -> str | None:
-        selected_device = self.get_device(slow_hwi_listing=slow_hwi_listing)
+    def register_multisig(self, address_descriptor: str) -> str | None:
+        selected_device = self.get_device()
         if not selected_device:
             return None
 

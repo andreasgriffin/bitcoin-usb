@@ -194,7 +194,7 @@ class ToolGui(QMainWindow):
         self.psbt_button.enable_button()
 
     def on_button_unlock_clicked(self) -> None:
-        self.usb.get_fingerprint_and_xpubs(slow_hwi_listing=True)
+        self.usb.get_fingerprint_and_xpubs()
 
     def on_button_xpubs_clicked(self) -> None:
         self.xpubs_text_edit.setText("")
