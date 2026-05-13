@@ -1,5 +1,6 @@
 import sys
 from collections.abc import Callable
+from enum import Enum
 from functools import partial
 from typing import Any
 
@@ -19,6 +20,12 @@ from PyQt6.QtWidgets import (
 )
 
 from bitcoin_usb.util import get_icon_path
+
+
+class AutoScanMode(Enum):
+    OFF = "off"
+    USB = "usb"
+    BLUETOOTH = "bluetooth"
 
 
 def get_message_box(
@@ -68,7 +75,8 @@ class DeviceDialog(QDialog):
         bluetooth_scan_callback: Callable[[], list[dict[str, Any]]] | None = None,
         install_udev_callback: Callable[[], None] | None = None,
         autoselect_if_1_device: bool = False,
-    ):
+        autoscan_mode: AutoScanMode = AutoScanMode.USB,
+    ) -> None:
         super().__init__(parent)
         self.setWindowTitle(self.tr("Select the detected device"))
         self._layout = QVBoxLayout(self)
@@ -79,6 +87,7 @@ class DeviceDialog(QDialog):
         self.bluetooth_scan_callback = bluetooth_scan_callback
         self.install_udev_callback = install_udev_callback
         self.autoselect_if_1_device = autoselect_if_1_device
+        self.autoscan_mode = autoscan_mode
         self.selected_device: dict[str, Any] | None = None
         self._devices_by_key: dict[tuple[str, str, str], dict[str, Any]] = {}
         self._scan_thread: QThread | None = None
@@ -175,6 +184,11 @@ class DeviceDialog(QDialog):
                 candidate.setDefault(candidate is button)
         if button:
             button.setFocus()
+
+    def _default_scan_button(self) -> QPushButton:
+        if self.autoscan_mode is AutoScanMode.BLUETOOTH and self.bluetooth_scan_callback:
+            return self.bluetooth_scan_button
+        return self.usb_scan_button
 
     def select_device(self, device: dict[str, Any]):
         self.selected_device = device
@@ -359,7 +373,7 @@ class DeviceDialog(QDialog):
             ):
                 self._set_default_action_button(device_button)
         else:
-            self._set_default_action_button(self.usb_scan_button)
+            self._set_default_action_button(self._default_scan_button())
         self._stop_scan(wait_timeout_ms=50)
 
     @classmethod
@@ -449,6 +463,13 @@ class DeviceDialog(QDialog):
     def get_selected_device(self) -> dict[str, Any] | None:
         return self.selected_device
 
+    def _run_initial_autoscan(self) -> None:
+        if self.autoscan_mode is AutoScanMode.USB:
+            self.scan_usb_devices()
+            return
+        if self.autoscan_mode is AutoScanMode.BLUETOOTH:
+            self.scan_for_bluetooth_devices()
+
     def closeEvent(self, a0: QCloseEvent | None) -> None:
         self._stop_scan(wait_timeout_ms=0)
         super().closeEvent(a0)
@@ -457,4 +478,4 @@ class DeviceDialog(QDialog):
         super().showEvent(a0)
         if not self._has_auto_scanned_on_open:
             self._has_auto_scanned_on_open = True
-            self.scan_usb_devices()
+            self._run_initial_autoscan()
