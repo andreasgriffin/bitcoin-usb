@@ -19,7 +19,7 @@ from PyQt6.QtCore import QObject, pyqtSignal
 from PyQt6.QtWidgets import QMessageBox, QPushButton
 
 from bitcoin_usb.address_types import AddressType
-from bitcoin_usb.dialogs import DeviceDialog, get_message_box
+from bitcoin_usb.dialogs import AutoScanMode, DeviceDialog, get_message_box
 from bitcoin_usb.jade_ble_client import discover_jade_ble_devices, scan_ble_devices
 from bitcoin_usb.trezor_thp import enumerate_trezor_thp_devices, is_trezor_modern_device
 
@@ -95,10 +95,11 @@ class USBGui(QObject):
         network: bdk.Network,
         loop_in_thread: LoopInThread,
         allow_emulators_only_for_testnet_works: bool = True,
-        autoselect_if_1_device=False,
-        initalization_label="",
-        parent=None,
+        autoselect_if_1_device: bool = False,
+        initalization_label: str = "",
+        parent: QObject | None = None,
         enable_bluetooth: bool = True,
+        autoscan_mode: AutoScanMode = AutoScanMode.USB,
     ) -> None:
         super().__init__()
         self.autoselect_if_1_device = autoselect_if_1_device
@@ -106,12 +107,16 @@ class USBGui(QObject):
         self.loop_in_thread = loop_in_thread
         self._parent = parent
         self.enable_bluetooth = enable_bluetooth
+        self.autoscan_mode = autoscan_mode
         self._bluetooth_scan_supported: bool | None = None
         self.initalization_label = clean_string(initalization_label)
         self.allow_emulators_only_for_testnet_works = allow_emulators_only_for_testnet_works
 
-    def set_initalization_label(self, value: str):
+    def set_initalization_label(self, value: str) -> None:
         self.initalization_label = clean_string(value)
+
+    def set_autoscan_mode(self, autoscan_mode: AutoScanMode) -> None:
+        self.autoscan_mode = autoscan_mode
 
     def get_devices(self) -> list[dict[str, Any]]:
         "Enumerate available HWI devices."
@@ -142,11 +147,19 @@ class USBGui(QObject):
             if platform.system() == "Linux"
             else None,
             autoselect_if_1_device=self.autoselect_if_1_device,
+            autoscan_mode=self._get_dialog_autoscan_mode(bluetooth_scan_callback),
         )
         if dialog.exec():
             return dialog.get_selected_device()
         self.signal_end_hwi_blocker.emit()
         return None
+
+    def _get_dialog_autoscan_mode(
+        self, bluetooth_scan_callback: Callable[[], list[dict[str, Any]]] | None
+    ) -> AutoScanMode:
+        if self.autoscan_mode is AutoScanMode.BLUETOOTH and bluetooth_scan_callback is None:
+            return AutoScanMode.OFF
+        return self.autoscan_mode
 
     def get_bluetooth_devices(self) -> list[dict[str, Any]]:
         if not self.enable_bluetooth:
