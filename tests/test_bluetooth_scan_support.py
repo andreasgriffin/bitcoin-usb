@@ -1,5 +1,7 @@
 from typing import cast
 
+from PyQt6.QtGui import QIcon
+
 from bitcoin_usb import usb_gui
 from bitcoin_usb.dialogs import AutoScanMode, DeviceDialog
 from bitcoin_usb.usb_gui import USBGui
@@ -78,12 +80,14 @@ def test_get_device_exposes_bluetooth_scan_callback_when_enabled(monkeypatch) ->
             install_udev_callback,
             autoselect_if_1_device,
             autoscan_mode,
+            window_icon,
         ):
             _ = parent
             _ = network
             _ = usb_scan_callback
             _ = install_udev_callback
             _ = autoselect_if_1_device
+            _ = window_icon
             captured["bluetooth_scan_callback"] = bluetooth_scan_callback
             captured["autoscan_mode"] = autoscan_mode
 
@@ -119,12 +123,14 @@ def test_get_device_hides_bluetooth_scan_callback_when_disabled(monkeypatch) -> 
             install_udev_callback,
             autoselect_if_1_device,
             autoscan_mode,
+            window_icon,
         ):
             _ = parent
             _ = network
             _ = usb_scan_callback
             _ = install_udev_callback
             _ = autoselect_if_1_device
+            _ = window_icon
             captured["bluetooth_scan_callback"] = bluetooth_scan_callback
             captured["autoscan_mode"] = autoscan_mode
 
@@ -139,6 +145,70 @@ def test_get_device_hides_bluetooth_scan_callback_when_disabled(monkeypatch) -> 
     assert gui.get_device() is None
     assert captured["bluetooth_scan_callback"] is None
     assert captured["autoscan_mode"] is AutoScanMode.OFF
+
+
+def test_get_device_passes_window_icon_to_dialog(monkeypatch) -> None:
+    window_icon = QIcon()
+    gui = USBGui(network=object(), loop_in_thread=object(), window_icon=window_icon)
+    captured: dict[str, object] = {}
+
+    class _FakeDialog:
+        def __init__(
+            self,
+            parent,
+            network,
+            usb_scan_callback,
+            bluetooth_scan_callback,
+            install_udev_callback,
+            autoselect_if_1_device,
+            autoscan_mode,
+            window_icon,
+        ):
+            _ = parent
+            _ = network
+            _ = usb_scan_callback
+            _ = bluetooth_scan_callback
+            _ = install_udev_callback
+            _ = autoselect_if_1_device
+            _ = autoscan_mode
+            captured["window_icon"] = window_icon
+
+        def exec(self) -> bool:
+            return False
+
+        def get_selected_device(self):
+            raise AssertionError("Not expected when dialog is rejected")
+
+    monkeypatch.setattr(usb_gui, "DeviceDialog", _FakeDialog)
+
+    assert gui.get_device() is None
+    assert captured["window_icon"] is window_icon
+
+
+def test_show_error_message_passes_window_icon_to_message_box(monkeypatch) -> None:
+    window_icon = QIcon()
+    gui = USBGui(network=object(), loop_in_thread=object(), window_icon=window_icon)
+    captured: dict[str, object] = {}
+
+    class _FakeMessageBox:
+        def exec(self) -> None:
+            captured["exec_called"] = True
+
+    def fake_get_message_box(text, icon, title, window_icon):
+        captured["text"] = text
+        captured["icon"] = icon
+        captured["title"] = title
+        captured["window_icon"] = window_icon
+        return _FakeMessageBox()
+
+    monkeypatch.setattr(usb_gui.platform, "system", lambda: "Windows")
+    monkeypatch.setattr(usb_gui, "get_message_box", fake_get_message_box)
+
+    gui.show_error_message("boom")
+
+    assert captured["text"] == "boom"
+    assert captured["window_icon"] is window_icon
+    assert captured["exec_called"] is True
 
 
 def test_set_autoscan_mode_updates_mode() -> None:
