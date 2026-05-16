@@ -16,7 +16,8 @@ from bitcoin_safe_lib.util_os import xdg_open_file
 from bleak import BleakClient, BleakScanner
 from hwilib.devices.bitbox02 import Bitbox02Client
 from PyQt6.QtCore import QObject, pyqtSignal
-from PyQt6.QtWidgets import QMessageBox, QPushButton
+from PyQt6.QtGui import QIcon
+from PyQt6.QtWidgets import QMessageBox, QPushButton, QWidget
 
 from bitcoin_usb.address_types import AddressType
 from bitcoin_usb.dialogs import AutoScanMode, DeviceDialog, get_message_box
@@ -100,6 +101,7 @@ class USBGui(QObject):
         parent: QObject | None = None,
         enable_bluetooth: bool = True,
         autoscan_mode: AutoScanMode = AutoScanMode.USB,
+        window_icon: QIcon | None = None,
     ) -> None:
         super().__init__()
         self.autoselect_if_1_device = autoselect_if_1_device
@@ -111,6 +113,11 @@ class USBGui(QObject):
         self._bluetooth_scan_supported: bool | None = None
         self.initalization_label = clean_string(initalization_label)
         self.allow_emulators_only_for_testnet_works = allow_emulators_only_for_testnet_works
+        self.window_icon = window_icon
+
+    def _apply_window_icon(self, widget: QWidget) -> None:
+        if self.window_icon is not None:
+            widget.setWindowIcon(self.window_icon)
 
     def set_initalization_label(self, value: str) -> None:
         self.initalization_label = clean_string(value)
@@ -148,6 +155,7 @@ class USBGui(QObject):
             else None,
             autoselect_if_1_device=self.autoselect_if_1_device,
             autoscan_mode=self._get_dialog_autoscan_mode(bluetooth_scan_callback),
+            window_icon=self.window_icon,
         )
         if dialog.exec():
             return dialog.get_selected_device()
@@ -325,11 +333,13 @@ class USBGui(QObject):
         if not selected_device:
             return None
         if str(selected_device.get("type", "")).lower() != "bitbox02":
-            QMessageBox.information(
-                None,
-                "Not supported",
-                "This is currently only supported for Bitbox02",
+            msg_box = get_message_box(
+                text="This is currently only supported for Bitbox02",
+                title="Not supported",
+                icon=QMessageBox.Icon.Information,
+                window_icon=self.window_icon,
             )
+            msg_box.exec()
             self.signal_end_hwi_blocker.emit()
             return None
 
@@ -410,6 +420,7 @@ class USBGui(QObject):
                 text=text,
                 icon=QMessageBox.Icon.Critical,
                 title=translate("bitcoin_usb", "Error"),
+                window_icon=self.window_icon,
             )
             # Show the text box and wait for a response
             msg_box.exec()
@@ -420,6 +431,7 @@ class USBGui(QObject):
         msg_box.setIcon(QMessageBox.Icon.Critical)
         msg_box.setText(text)
         msg_box.setWindowTitle(translate("bitcoin_usb", "Error"))
+        self._apply_window_icon(msg_box)
 
         # Add standard buttons
         msg_box.setStandardButtons(QMessageBox.StandardButton.Ok)

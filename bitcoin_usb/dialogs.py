@@ -29,13 +29,18 @@ class AutoScanMode(Enum):
 
 
 def get_message_box(
-    text: str, icon: QMessageBox.Icon = QMessageBox.Icon.Information, title: str = ""
+    text: str,
+    icon: QMessageBox.Icon = QMessageBox.Icon.Information,
+    title: str = "",
+    window_icon: QIcon | None = None,
 ) -> QMessageBox:
     # Create the text box
     msg_box = QMessageBox()
     msg_box.setIcon(icon)
     msg_box.setText(text)
     msg_box.setWindowTitle(title)
+    if window_icon is not None:
+        msg_box.setWindowIcon(window_icon)
 
     # Add standard buttons
     msg_box.setStandardButtons(QMessageBox.StandardButton.Ok)
@@ -76,9 +81,12 @@ class DeviceDialog(QDialog):
         install_udev_callback: Callable[[], None] | None = None,
         autoselect_if_1_device: bool = False,
         autoscan_mode: AutoScanMode = AutoScanMode.USB,
+        window_icon: QIcon | None = None,
     ) -> None:
         super().__init__(parent)
         self.setWindowTitle(self.tr("Select the detected device"))
+        if window_icon is not None:
+            self.setWindowIcon(window_icon)
         self._layout = QVBoxLayout(self)
         self.setModal(True)
 
@@ -360,6 +368,7 @@ class DeviceDialog(QDialog):
             text=self.tr("Device scan failed: {error}").format(error=str(exception)),
             title=self.tr("Device scan"),
             icon=QMessageBox.Icon.Critical,
+            window_icon=self.windowIcon(),
         ).exec()
         self._on_scan_finished()
 
