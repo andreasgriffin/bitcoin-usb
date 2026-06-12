@@ -129,3 +129,11 @@ def test_get_fingerprint_and_xpubs_runs_inline_for_usb_on_macos(monkeypatch) -> 
     result = gui.get_fingerprint_and_xpubs()
 
     assert result == (selected_device, "f00dbabe", {})
+
+
+def test_bitbox02_usb_devices_run_in_worker_on_linux(monkeypatch) -> None:
+    selected_device = {"type": "bitbox02", "path": "usb:1"}
+
+    monkeypatch.setattr(usb_gui.platform, "system", lambda: "Linux")
+
+    assert USBGui._should_run_in_worker(selected_device) is True

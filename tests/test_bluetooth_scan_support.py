@@ -75,6 +75,7 @@ def test_get_device_exposes_bluetooth_scan_callback_when_enabled(monkeypatch) ->
             self,
             parent,
             network,
+            loop_in_thread,
             usb_scan_callback,
             bluetooth_scan_callback,
             install_udev_callback,
@@ -84,6 +85,7 @@ def test_get_device_exposes_bluetooth_scan_callback_when_enabled(monkeypatch) ->
         ):
             _ = parent
             _ = network
+            _ = loop_in_thread
             _ = usb_scan_callback
             _ = install_udev_callback
             _ = autoselect_if_1_device
@@ -118,6 +120,7 @@ def test_get_device_hides_bluetooth_scan_callback_when_disabled(monkeypatch) -> 
             self,
             parent,
             network,
+            loop_in_thread,
             usb_scan_callback,
             bluetooth_scan_callback,
             install_udev_callback,
@@ -127,6 +130,7 @@ def test_get_device_hides_bluetooth_scan_callback_when_disabled(monkeypatch) -> 
         ):
             _ = parent
             _ = network
+            _ = loop_in_thread
             _ = usb_scan_callback
             _ = install_udev_callback
             _ = autoselect_if_1_device
@@ -157,6 +161,7 @@ def test_get_device_passes_window_icon_to_dialog(monkeypatch) -> None:
             self,
             parent,
             network,
+            loop_in_thread,
             usb_scan_callback,
             bluetooth_scan_callback,
             install_udev_callback,
@@ -166,6 +171,7 @@ def test_get_device_passes_window_icon_to_dialog(monkeypatch) -> None:
         ):
             _ = parent
             _ = network
+            _ = loop_in_thread
             _ = usb_scan_callback
             _ = bluetooth_scan_callback
             _ = install_udev_callback

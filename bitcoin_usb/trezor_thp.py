@@ -19,7 +19,8 @@ from hwilib.errors import (
 from hwilib.hwwclient import HardwareWalletClient
 from hwilib.key import ExtendedKey
 from hwilib.psbt import PSBT
-from PyQt6.QtCore import QCoreApplication, QObject, QThread, pyqtSignal
+from PyQt6 import sip
+from PyQt6.QtCore import Q_ARG, QCoreApplication, QMetaObject, QObject, Qt, QThread, pyqtSlot
 from PyQt6.QtWidgets import QInputDialog, QLineEdit
 from trezorlib import device, messages
 from trezorlib.client import AppManifest, PassphraseSetting, TrezorClient
@@ -28,7 +29,8 @@ from trezorlib.models import T3W1, TrezorModel
 from trezorlib.thp.client import TrezorClientThp
 from trezorlib.thp.credentials import Credential
 from trezorlib.thp.pairing import default_pairing_flow
-from trezorlib.transport import enumerate_devices as trezorlib_enumerate_devices
+from trezorlib.transport import Transport
+from trezorlib.transport import all_transports as trezorlib_all_transports
 from trezorlib.transport import get_transport as trezorlib_get_transport
 
 from bitcoin_usb.i18n import translate
@@ -52,16 +54,8 @@ class _TextRequest:
 
 
 class _MainThreadTextPrompt(QObject):
-    request_text = pyqtSignal(object)
-
-    def __init__(self) -> None:
-        super().__init__()
-        self.request_text.connect(self._show_text_dialog)
-
-    def request(self, text_request: _TextRequest) -> None:
-        self.request_text.emit(text_request)
-
-    def _show_text_dialog(self, payload: object) -> None:
+    @pyqtSlot(object)
+    def show_text_dialog(self, payload: object) -> None:
         if not isinstance(payload, _TextRequest):
             raise TypeError(f"Unexpected payload type: {type(payload)!r}")
 
@@ -73,7 +67,17 @@ class _MainThreadTextPrompt(QObject):
             payload.done.set()
 
 
-_MAIN_THREAD_TEXT_PROMPT = _MainThreadTextPrompt()
+_MAIN_THREAD_TEXT_PROMPT: _MainThreadTextPrompt | None = None
+
+
+def _get_main_thread_text_prompt() -> _MainThreadTextPrompt:
+    global _MAIN_THREAD_TEXT_PROMPT
+    if _MAIN_THREAD_TEXT_PROMPT is None or sip.isdeleted(_MAIN_THREAD_TEXT_PROMPT):
+        _MAIN_THREAD_TEXT_PROMPT = _MainThreadTextPrompt()
+        app = QCoreApplication.instance()
+        if app is not None:
+            _MAIN_THREAD_TEXT_PROMPT.moveToThread(app.thread())
+    return _MAIN_THREAD_TEXT_PROMPT
 
 
 def is_trezor_modern_device(device_info: dict[str, Any]) -> bool:
@@ -93,11 +97,25 @@ def _should_use_local_trezor_client(client: TrezorClient) -> bool:
     )
 
 
+def _enumerate_trezor_transports() -> list[Transport]:
+    devices: list[Transport] = []
+    for transport_cls in trezorlib_all_transports():
+        if transport_cls.PATH_PREFIX == "ble":
+            continue
+        try:
+            devices.extend(list(transport_cls.enumerate()))
+        except Exception as exc:
+            logger.debug(
+                "Skipping failed Trezor transport enumeration for %s: %s", transport_cls.__name__, exc
+            )
+    return devices
+
+
 def enumerate_trezor_thp_devices() -> list[dict[str, Any]]:
     app = AppManifest(app_name=TREZOR_APP_NAME)
     devices: list[dict[str, Any]] = []
 
-    for transport in trezorlib_enumerate_devices():
+    for transport in _enumerate_trezor_transports():
         path = transport.get_path()
         if path.startswith("ble:"):
             transport.close()
@@ -143,7 +161,12 @@ def _request_text(title: str, label: str, echo: QLineEdit.EchoMode = QLineEdit.E
         return _show_text_dialog(title, label, echo)
 
     text_request = _TextRequest(title=title, label=label, echo=echo)
-    _MAIN_THREAD_TEXT_PROMPT.request(text_request)
+    QMetaObject.invokeMethod(
+        _get_main_thread_text_prompt(),
+        "show_text_dialog",
+        Qt.ConnectionType.QueuedConnection,
+        Q_ARG(object, text_request),
+    )
     text_request.done.wait()
 
     if text_request.error is not None:

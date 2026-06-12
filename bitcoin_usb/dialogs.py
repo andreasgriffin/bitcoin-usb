@@ -1,11 +1,14 @@
+import asyncio
 import sys
 from collections.abc import Callable
+from concurrent.futures import Future
 from enum import Enum
 from functools import partial
 from typing import Any
 
 import bdkpython as bdk
-from PyQt6.QtCore import QObject, Qt, QThread, pyqtSignal
+from bitcoin_safe_lib.async_tools.loop_in_thread import LoopInThread
+from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QCloseEvent, QGuiApplication, QIcon, QShowEvent
 from PyQt6.QtWidgets import (
     QDialog,
@@ -48,27 +51,7 @@ def get_message_box(
     return msg_box
 
 
-# Worker class for the blocking operation
-class Worker(QObject):
-    finished = pyqtSignal(object)
-    error = pyqtSignal(Exception)  # New signal for errors
-
-    def __init__(self, func, *args, **kwargs):
-        super().__init__()
-        self.func = func
-        self.args = args
-        self.kwargs = kwargs
-
-    def run(self):
-        try:
-            func_result = self.func(*self.args, **self.kwargs)
-            self.finished.emit(func_result)  # Emit the func_result if successful
-        except Exception as e:
-            self.error.emit(e)  # Emit error if an exception occurs
-
-
 class DeviceDialog(QDialog):
-    _detached_scan_threads: set[QThread] = set()
     _usb_icon_path = get_icon_path("bi--usb-symbol.svg")
     _bluetooth_icon_path = get_icon_path("bi--bluetooth.svg")
 
@@ -76,6 +59,7 @@ class DeviceDialog(QDialog):
         self,
         parent,
         network: bdk.Network,
+        loop_in_thread: LoopInThread,
         usb_scan_callback: Callable[[], list[dict[str, Any]]],
         bluetooth_scan_callback: Callable[[], list[dict[str, Any]]] | None = None,
         install_udev_callback: Callable[[], None] | None = None,
@@ -91,6 +75,7 @@ class DeviceDialog(QDialog):
         self.setModal(True)
 
         self.network = network
+        self.loop_in_thread = loop_in_thread
         self.usb_scan_callback = usb_scan_callback
         self.bluetooth_scan_callback = bluetooth_scan_callback
         self.install_udev_callback = install_udev_callback
@@ -98,8 +83,8 @@ class DeviceDialog(QDialog):
         self.autoscan_mode = autoscan_mode
         self.selected_device: dict[str, Any] | None = None
         self._devices_by_key: dict[tuple[str, str, str], dict[str, Any]] = {}
-        self._scan_thread: QThread | None = None
-        self._scan_worker: Worker | None = None
+        self._active_scan_future: Future[list[dict[str, Any]]] | None = None
+        self._active_scan_token = 0
         self._has_auto_scanned_on_open = False
         self._has_completed_usb_scan = False
         self._scan_finished_message = ""
@@ -341,7 +326,9 @@ class DeviceDialog(QDialog):
 
         return self.tr("Try to {actions}.").format(actions=action_text)
 
-    def _on_scan_result(self, source: str, result: object):
+    def _on_scan_result(self, source: str, token: int, result: object) -> None:
+        if token != self._active_scan_token:
+            return
         devices = result if isinstance(result, list) else []
         transport = "bluetooth" if source == "bluetooth" else "usb"
         self._replace_devices_for_transport(transport=transport, devices=devices)
@@ -360,7 +347,9 @@ class DeviceDialog(QDialog):
 
         self._on_scan_finished()
 
-    def _on_scan_error(self, source: str, exception: Exception):
+    def _on_scan_error(self, source: str, token: int, exception: BaseException) -> None:
+        if token != self._active_scan_token:
+            return
         if source == "usb":
             self._has_completed_usb_scan = True
             self._update_install_udev_button_visibility()
@@ -372,7 +361,7 @@ class DeviceDialog(QDialog):
         ).exec()
         self._on_scan_finished()
 
-    def _on_scan_finished(self):
+    def _on_scan_finished(self) -> None:
         self._set_scanning(False)
         self._set_instructions_message(self._scan_finished_message)
         self._scan_finished_message = ""
@@ -383,72 +372,30 @@ class DeviceDialog(QDialog):
                 self._set_default_action_button(device_button)
         else:
             self._set_default_action_button(self._default_scan_button())
-        self._stop_scan(wait_timeout_ms=50)
+        self._active_scan_future = None
 
-    @classmethod
-    def _track_detached_scan_thread(cls, thread: QThread, worker: Worker | None) -> None:
-        cls._detached_scan_threads.add(thread)
-
-        def _cleanup_detached_thread() -> None:
-            if worker:
-                worker.deleteLater()
-            thread.deleteLater()
-            cls._detached_scan_threads.discard(thread)
-
-        thread.finished.connect(_cleanup_detached_thread)
-
-    @staticmethod
-    def _disconnect_scan_worker(worker: Worker) -> None:
-        for signal in (worker.finished, worker.error):
-            try:
-                signal.disconnect()
-            except TypeError:
-                # No connections remain.
-                pass
-
-    def _stop_scan(self, wait_timeout_ms: int) -> None:
-        worker = self._scan_worker
-        thread = self._scan_thread
-        self._scan_worker = None
-        self._scan_thread = None
-
-        if not thread:
-            return
-
-        if worker:
-            self._disconnect_scan_worker(worker)
-
-        if thread.isRunning():
-            thread.requestInterruption()
-            thread.quit()
-            if wait_timeout_ms > 0 and thread.wait(wait_timeout_ms):
-                if worker:
-                    worker.deleteLater()
-                thread.deleteLater()
-                return
-            thread.setParent(None)
-            self._track_detached_scan_thread(thread=thread, worker=worker)
-            return
-
-        if worker:
-            worker.deleteLater()
-        thread.deleteLater()
+    def _stop_scan(self) -> None:
+        future = self._active_scan_future
+        self._active_scan_future = None
+        self._active_scan_token += 1
+        if future is not None:
+            future.cancel()
 
     def _start_scan(
         self, scan_fn: Callable[[], list[dict[str, Any]]], source: str, message: str, finished_message: str
     ) -> None:
-        if self._scan_thread and self._scan_thread.isRunning():
+        if self._active_scan_future and not self._active_scan_future.done():
             return
 
         self._set_scanning(True)
         self._scan_finished_message = finished_message
-        self._scan_worker = Worker(scan_fn)
-        self._scan_thread = QThread(self)
-        self._scan_worker.moveToThread(self._scan_thread)
-        self._scan_thread.started.connect(self._scan_worker.run)
-        self._scan_worker.finished.connect(lambda result: self._on_scan_result(source, result))
-        self._scan_worker.error.connect(lambda exception: self._on_scan_error(source, exception))
-        self._scan_thread.start()
+        self._active_scan_token += 1
+        token = self._active_scan_token
+        self._active_scan_future = self.loop_in_thread.run_task(
+            asyncio.to_thread(scan_fn),
+            on_success=lambda result: self._on_scan_result(source, token, result),
+            on_error=lambda exc_info: self._on_scan_error(source, token, exc_info[1]),
+        )
         self._set_instructions_message(message)
 
     def scan_usb_devices(self):
@@ -480,7 +427,7 @@ class DeviceDialog(QDialog):
             self.scan_for_bluetooth_devices()
 
     def closeEvent(self, a0: QCloseEvent | None) -> None:
-        self._stop_scan(wait_timeout_ms=0)
+        self._stop_scan()
         super().closeEvent(a0)
 
     def showEvent(self, a0: QShowEvent | None) -> None:
