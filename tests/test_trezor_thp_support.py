@@ -15,6 +15,7 @@ from bitcoin_usb.trezor_thp import (
     TrezorThpClient,
     _HwiMessageBridge,
     _HwiTrezorSessionAdapter,
+    _enumerate_trezor_transports,
     _request_text,
 )
 from bitcoin_usb.usb_gui import USBGui, enumerate_available_devices
@@ -52,6 +53,48 @@ def test_enumerate_available_devices_merges_trezor_thp(monkeypatch) -> None:
     assert {"type": "jade", "path": "usb:1"} in devices
     assert {"type": "trezor", "path": "webusb:001", "model": "Safe 7", "protocol": "thp"} in devices
     assert len(devices) == 2
+
+
+def test_enumerate_trezor_transports_skips_ble(monkeypatch) -> None:
+    calls: list[str] = []
+
+    class FakeTransport:
+        def __init__(self, path: str) -> None:
+            self._path = path
+
+        def get_path(self) -> str:
+            return self._path
+
+        def close(self) -> None:
+            return None
+
+    class FakeBleTransport:
+        PATH_PREFIX = "ble"
+        __name__ = "FakeBleTransport"
+
+        @classmethod
+        def enumerate(cls) -> list[FakeTransport]:
+            calls.append(cls.PATH_PREFIX)
+            raise AssertionError("BLE transport should not be enumerated")
+
+    class FakeWebUsbTransport:
+        PATH_PREFIX = "webusb"
+        __name__ = "FakeWebUsbTransport"
+
+        @classmethod
+        def enumerate(cls) -> list[FakeTransport]:
+            calls.append(cls.PATH_PREFIX)
+            return [FakeTransport("webusb:001")]
+
+    monkeypatch.setattr(
+        "bitcoin_usb.trezor_thp.trezorlib_all_transports",
+        lambda: [FakeBleTransport, FakeWebUsbTransport],
+    )
+
+    transports = _enumerate_trezor_transports()
+
+    assert calls == ["webusb"]
+    assert [transport.get_path() for transport in transports] == ["webusb:001"]
 
 
 def test_trezor_thp_devices_run_inline() -> None:

@@ -148,6 +148,7 @@ class USBGui(QObject):
         dialog = DeviceDialog(
             self._parent,
             network=self.network,
+            loop_in_thread=self.loop_in_thread,
             usb_scan_callback=self.get_devices,
             bluetooth_scan_callback=bluetooth_scan_callback,
             install_udev_callback=self.linux_cmd_install_udev_as_sudo

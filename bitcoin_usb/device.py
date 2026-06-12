@@ -2,6 +2,7 @@ import logging
 import threading
 from abc import abstractmethod
 from collections.abc import Callable
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
@@ -16,7 +17,18 @@ from hwilib.devices.jadepy.jade import DEFAULT_BLE_DEVICE_NAME
 from hwilib.devices.trezor import TrezorClient
 from hwilib.hwwclient import HardwareWalletClient
 from hwilib.psbt import PSBT
-from PyQt6.QtCore import QCoreApplication, QEventLoop, QObject, Qt, QThread, pyqtSignal
+from PyQt6 import sip
+from PyQt6.QtCore import (
+    Q_ARG,
+    QCoreApplication,
+    QEventLoop,
+    QMetaObject,
+    QObject,
+    Qt,
+    QThread,
+    pyqtSignal,
+    pyqtSlot,
+)
 from PyQt6.QtWidgets import (
     QDialog,
     QDialogButtonBox,
@@ -26,7 +38,6 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
-from bitcoin_usb.dialogs import Worker
 from bitcoin_usb.i18n import translate
 from bitcoin_usb.jade_ble_client import JadeBleClient
 from bitcoin_usb.trezor_thp import TrezorThpClient, is_trezor_modern_device
@@ -41,6 +52,57 @@ from .address_types import (
 )
 
 logger = logging.getLogger(__name__)
+
+
+@dataclass(slots=True)
+class _PairingRequest:
+    code: str
+    device_response: Callable[[], bool]
+    done: threading.Event = field(default_factory=threading.Event)
+    result: bool | None = None
+    error: BaseException | None = None
+
+
+class _ThreadedDialogBridge(QObject):
+    finished = pyqtSignal(object)
+    error = pyqtSignal(object)
+
+
+class _MainThreadBitBox02PairingPrompt(QObject):
+    @pyqtSlot(object)
+    def show_pairing_dialog(self, payload: object) -> None:
+        if not isinstance(payload, _PairingRequest):
+            raise TypeError(f"Unexpected payload type: {type(payload)!r}")
+
+        try:
+            dialog = ThreadedCapturePrintDialogBitBox02(
+                func=payload.device_response,
+                title=translate("usb", "Pair Bitbox02"),
+            )
+            dialog.add_text(
+                translate(
+                    "usb",
+                    "Please compare and confirm the pairing code on your BitBox02:\n\n{code}",
+                ).format(code=payload.code)
+            )
+            payload.result = dialog.get_result()
+        except BaseException as exc:
+            payload.error = exc
+        finally:
+            payload.done.set()
+
+
+_MAIN_THREAD_BITBOX02_PAIRING_PROMPT: _MainThreadBitBox02PairingPrompt | None = None
+
+
+def _get_main_thread_bitbox02_pairing_prompt() -> _MainThreadBitBox02PairingPrompt:
+    global _MAIN_THREAD_BITBOX02_PAIRING_PROMPT
+    if _MAIN_THREAD_BITBOX02_PAIRING_PROMPT is None or sip.isdeleted(_MAIN_THREAD_BITBOX02_PAIRING_PROMPT):
+        _MAIN_THREAD_BITBOX02_PAIRING_PROMPT = _MainThreadBitBox02PairingPrompt()
+        app = QCoreApplication.instance()
+        if app is not None:
+            _MAIN_THREAD_BITBOX02_PAIRING_PROMPT.moveToThread(app.thread())
+    return _MAIN_THREAD_BITBOX02_PAIRING_PROMPT
 
 
 def create_custom_message_box(
@@ -100,12 +162,15 @@ class ThreadedCapturePrintDialogBitBox02(QDialog):
         self.label = QLabel(message)
         self._layout.addWidget(self.label)
 
-        # Setup worker and thread
-        self.worker = Worker(func, *args, **kwargs)
-        self._thread = QThread()
-        self.worker.moveToThread(self._thread)
-        self.worker.finished.connect(self.handle_func_result)
-        self._thread.started.connect(self.worker.run)
+        self._func = func
+        self._args = args
+        self._kwargs = kwargs
+        self._thread: threading.Thread | None = None
+        self._worker_error: BaseException | None = None
+        self.func_result = False
+        self._bridge = _ThreadedDialogBridge(self)
+        self._bridge.finished.connect(self.handle_func_result)
+        self._bridge.error.connect(self.handle_func_error)
 
         self.loop = QEventLoop()  # Event loop to block for synchronous execution
 
@@ -121,21 +186,40 @@ class ThreadedCapturePrintDialogBitBox02(QDialog):
         self.buttonBox.accepted.connect(self.accept)
         self.buttonBox.rejected.connect(self.reject)
 
-    def handle_func_result(self, result):
+    def handle_func_result(self, result: object) -> None:
         self.func_result = result
         if self.loop.isRunning():
             self.loop.exit()  # Exit the loop only if it's running
 
-    def add_text(self, s: str):
+    def handle_func_error(self, error: object) -> None:
+        if isinstance(error, BaseException):
+            self._worker_error = error
+        else:
+            self._worker_error = RuntimeError(str(error))
+        if self.loop.isRunning():
+            self.loop.exit()
+        if self.dialog_loop.isRunning():
+            self.dialog_loop.exit(0)
+        self.close()
+
+    def _run_func(self) -> None:
+        try:
+            result = self._func(*self._args, **self._kwargs)
+        except BaseException as exc:
+            self._bridge.error.emit(exc)
+            return
+        self._bridge.finished.emit(result)
+
+    def add_text(self, s: str) -> None:
         old_text = self.label.text()
         self.label.setText(old_text + "\n\n" + s)
 
-    def accept(self):
+    def accept(self) -> None:
         self.button_click_result = True
         self.dialog_loop.exit(0)  # Stop the event loop
         super().accept()
 
-    def reject(self):
+    def reject(self) -> None:
         self.button_click_result = False
         self.dialog_loop.exit(0)  # Stop the event loop
         super().reject()
@@ -143,8 +227,13 @@ class ThreadedCapturePrintDialogBitBox02(QDialog):
     def get_result(self) -> bool:
         self.show()  # Show the dialog
 
-        self._thread.start()  # Start the thread
+        self._thread = threading.Thread(target=self._run_func, daemon=True, name="BitBox02DialogWorker")
+        self._thread.start()
         self.loop.exec()  # Block here until the operation finishes
+
+        if self._worker_error is not None:
+            self.end_thread()
+            raise self._worker_error
 
         # if no button was clicked yet, then block until one is clicked
         if self.button_click_result is None:
@@ -155,10 +244,9 @@ class ThreadedCapturePrintDialogBitBox02(QDialog):
         self.end_thread()
         return total_result
 
-    def end_thread(self):
-        if self._thread.isRunning():
-            self._thread.quit()
-            self._thread.wait()
+    def end_thread(self) -> None:
+        if self._thread and self._thread.is_alive():
+            self._thread.join(timeout=1.0)
 
 
 def bdknetwork_to_chain(network: bdk.Network):
@@ -205,19 +293,32 @@ class DialogNoiseConfig(CLINoiseConfig):
     """Noise pairing and attestation check handling in the terminal (stdin/stdout)"""
 
     def show_pairing(self, code: str, device_response: Callable[[], bool]) -> bool:
-        self.threaded_dialog = ThreadedCapturePrintDialogBitBox02(
-            func=device_response,
-            title=translate("usb", "Pair Bitbox02"),
-        )
-        self.threaded_dialog.add_text(
-            translate(
-                "usb",
-                "Please compare and confirm the pairing code on your BitBox02:\n\n{code}",
-            ).format(code=code)
-        )
-        result = self.threaded_dialog.get_result()
+        app = QCoreApplication.instance()
+        if app is None or QThread.currentThread() is app.thread():
+            self.threaded_dialog = ThreadedCapturePrintDialogBitBox02(
+                func=device_response,
+                title=translate("usb", "Pair Bitbox02"),
+            )
+            self.threaded_dialog.add_text(
+                translate(
+                    "usb",
+                    "Please compare and confirm the pairing code on your BitBox02:\n\n{code}",
+                ).format(code=code)
+            )
+            return self.threaded_dialog.get_result()
 
-        return result
+        pairing_request = _PairingRequest(code=code, device_response=device_response)
+        QMetaObject.invokeMethod(
+            _get_main_thread_bitbox02_pairing_prompt(),
+            "show_pairing_dialog",
+            Qt.ConnectionType.QueuedConnection,
+            Q_ARG(object, pairing_request),
+        )
+        pairing_request.done.wait()
+
+        if pairing_request.error is not None:
+            raise pairing_request.error
+        return bool(pairing_request.result)
 
     def attestation_check(self, result: bool) -> None:
         if result:
