@@ -34,7 +34,7 @@ jade-client = {git = "https://github.com/Blockstream/Jade.git", rev = "fb2642397
 aioitertools = "^0.13.0"  #  needed for jade-client
 
 [tool.poetry.group.dev.dependencies]
-pytest = "^8.2.2"
+pytest = ">=8.2.2,<10.0.0"
 
 [build-system]
 requires = ["poetry-core"]
