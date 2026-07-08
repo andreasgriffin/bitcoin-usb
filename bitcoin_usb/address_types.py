@@ -58,7 +58,7 @@ class AddressType:
         name: str,
         is_multisig: bool,
         hwi_descriptor_classes: Sequence[type[Descriptor]],
-        key_origin: Callable[[bdk.Network], str],
+        full_key_origin: Callable[[bdk.Network, int], str],
         bdk_descriptor_secret: Callable[
             [bdk.DescriptorSecretKey, bdk.KeychainKind, bdk.Network], bdk.Descriptor
         ]
@@ -74,7 +74,7 @@ class AddressType:
         self.short_name = short_name
         self.name = name
         self.is_multisig = is_multisig
-        self.key_origin: Callable[[bdk.Network], str] = key_origin
+        self.full_key_origin: Callable[[bdk.Network, int], str] = full_key_origin
         self.bdk_descriptor_secret = bdk_descriptor_secret
         self.info_url = info_url
         self.description = description
@@ -86,7 +86,7 @@ class AddressType:
             short_name=self.short_name,
             name=self.name,
             is_multisig=self.is_multisig,
-            key_origin=self.key_origin,
+            full_key_origin=self.full_key_origin,
             bdk_descriptor_secret=self.bdk_descriptor_secret,
             info_url=self.info_url,
             description=self.description,
@@ -100,6 +100,9 @@ class AddressType:
     def __repr__(self):
         return f"AddressType({self.__dict__})"
 
+    def key_origin(self, network: bdk.Network, account_number: int = 0) -> str:
+        return self.full_key_origin(network, account_number)
+
     def get_bip32_path(self, network: bdk.Network, keychain: bdk.KeychainKind, address_index: int) -> str:
         return f"m/{0 if keychain == bdk.KeychainKind.EXTERNAL else 1}/{address_index}"
 
@@ -109,7 +112,8 @@ class AddressTypes:
         "p2pkh",
         "Single Sig (Legacy/p2pkh)",
         is_multisig=False,
-        key_origin=lambda network: f"m/44h/{0 if network == bdk.Network.BITCOIN else 1}h/0h",
+        full_key_origin=lambda network,
+        account: f"m/44h/{0 if network == bdk.Network.BITCOIN else 1}h/{account}h",
         bdk_descriptor=bdk.Descriptor.new_bip44_public,
         bdk_descriptor_secret=bdk.Descriptor.new_bip44,
         info_url="https://learnmeabitcoin.com/technical/derivation-paths",
@@ -120,7 +124,8 @@ class AddressTypes:
         "p2sh-p2wpkh",
         "Single Sig (Nested/p2sh-p2wpkh)",
         is_multisig=False,
-        key_origin=lambda network: f"m/49h/{0 if network == bdk.Network.BITCOIN else 1}h/0h",
+        full_key_origin=lambda network,
+        account: f"m/49h/{0 if network == bdk.Network.BITCOIN else 1}h/{account}h",
         bdk_descriptor=bdk.Descriptor.new_bip49_public,
         bdk_descriptor_secret=bdk.Descriptor.new_bip49,
         info_url="https://learnmeabitcoin.com/technical/derivation-paths",
@@ -131,7 +136,8 @@ class AddressTypes:
         "p2wpkh",
         "Single Sig (SegWit/p2wpkh)",
         is_multisig=False,
-        key_origin=lambda network: f"m/84h/{0 if network == bdk.Network.BITCOIN else 1}h/0h",
+        full_key_origin=lambda network,
+        account: f"m/84h/{0 if network == bdk.Network.BITCOIN else 1}h/{account}h",
         bdk_descriptor=bdk.Descriptor.new_bip84_public,
         bdk_descriptor_secret=bdk.Descriptor.new_bip84,
         info_url="https://learnmeabitcoin.com/technical/derivation-paths",
@@ -142,7 +148,8 @@ class AddressTypes:
         "p2tr",
         "Single Sig (Taproot/p2tr)",
         is_multisig=False,
-        key_origin=lambda network: f"m/86h/{0 if network == bdk.Network.BITCOIN else 1}h/0h",
+        full_key_origin=lambda network,
+        account: f"m/86h/{0 if network == bdk.Network.BITCOIN else 1}h/{account}h",
         bdk_descriptor=bdk.Descriptor.new_bip86_public,
         bdk_descriptor_secret=bdk.Descriptor.new_bip86,
         info_url="https://github.com/bitcoin/bips/blob/master/bip-0386.mediawiki",
@@ -153,7 +160,8 @@ class AddressTypes:
         "p2sh-p2wsh",
         "Multi Sig (Nested/p2sh-p2wsh)",
         is_multisig=True,
-        key_origin=lambda network: f"m/48h/{0 if network == bdk.Network.BITCOIN else 1}h/0h/1h",
+        full_key_origin=lambda network,
+        account: f"m/48h/{0 if network == bdk.Network.BITCOIN else 1}h/{account}h/1h",
         bdk_descriptor_secret=None,
         info_url="https://github.com/bitcoin/bips/blob/master/bip-0048.mediawiki",
         description="Nested (multi sig) addresses that look like 3addresses",
@@ -163,7 +171,8 @@ class AddressTypes:
         "p2wsh",
         "Multi Sig (SegWit/p2wsh)",
         is_multisig=True,
-        key_origin=lambda network: f"m/48h/{0 if network == bdk.Network.BITCOIN else 1}h/0h/2h",
+        full_key_origin=lambda network,
+        account: f"m/48h/{0 if network == bdk.Network.BITCOIN else 1}h/{account}h/2h",
         bdk_descriptor_secret=None,
         info_url="https://github.com/bitcoin/bips/blob/master/bip-0048.mediawiki",
         description="SegWit (multi sig) addresses that look like bc1addresses",
