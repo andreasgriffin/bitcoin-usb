@@ -37,6 +37,13 @@ def test_address_types():
 
     assert AddressTypes.p2wsh.key_origin(bdk.Network.REGTEST) == "m/48h/1h/0h/2h"
     assert AddressTypes.p2wsh.key_origin(bdk.Network.BITCOIN) == "m/48h/0h/0h/2h"
+    assert AddressTypes.p2pkh.key_origin(bdk.Network.REGTEST, account_number=3) == "m/44h/1h/3h"
+    assert AddressTypes.p2wsh.key_origin(bdk.Network.BITCOIN, account_number=4) == "m/48h/0h/4h/2h"
+
+
+def test_address_type_full_key_origin():
+    assert AddressTypes.p2wpkh.full_key_origin(bdk.Network.REGTEST, 1) == "m/84h/1h/1h"
+    assert AddressTypes.p2wsh.full_key_origin(bdk.Network.BITCOIN, 7) == "m/48h/0h/7h/2h"
 
 
 def test_SimplePubKeyProvider():
