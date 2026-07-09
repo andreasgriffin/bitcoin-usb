@@ -51,10 +51,12 @@ class SoftwareSigner(BaseDevice):
         xpub, fingerprint = derive(self.mnemonic, address_type.key_origin(self.network), self.network)
         return fingerprint
 
-    def get_xpubs(self) -> dict[AddressType, str]:
+    def get_xpubs(self, account_index: int = 0) -> dict[AddressType, str]:
         xpubs = {}
         for address_type in get_all_address_types():
-            xpub, fingerprint = derive(self.mnemonic, address_type.key_origin(self.network), self.network)
+            xpub, fingerprint = derive(
+                self.mnemonic, address_type.key_origin(self.network, account_index), self.network
+            )
             xpubs[address_type] = xpub
         return xpubs
 

@@ -270,7 +270,7 @@ class BaseDevice:
         pass
 
     @abstractmethod
-    def get_xpubs(self) -> dict[AddressType, str]:
+    def get_xpubs(self, account_index: int = 0) -> dict[AddressType, str]:
         pass
 
     @abstractmethod
@@ -487,10 +487,10 @@ class USBDevice(BaseDevice, QObject):
         assert self.client
         return self.client.get_master_fingerprint().hex()
 
-    def get_xpubs(self) -> dict[AddressType, str]:
+    def get_xpubs(self, account_index: int = 0) -> dict[AddressType, str]:
         xpubs: dict[AddressType, str] = {}
         for address_type in get_all_address_types():
-            xpubs[address_type] = self.get_xpub(address_type.key_origin(self.network))
+            xpubs[address_type] = self.get_xpub(address_type.key_origin(self.network, account_index))
             self._process_pending_gui_events()
         return xpubs
 
