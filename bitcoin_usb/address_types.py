@@ -60,13 +60,13 @@ class AddressType:
         hwi_descriptor_classes: Sequence[type[Descriptor]],
         full_key_origin: Callable[[bdk.Network, int], str],
         bdk_descriptor_secret: Callable[
-            [bdk.DescriptorSecretKey, bdk.KeychainKind, bdk.Network], bdk.Descriptor
+            [bdk.DescriptorSecretKey, bdk.KeychainKind, bdk.NetworkKind], bdk.Descriptor
         ]
         | None = None,
         info_url: str | None = None,
         description: str | None = None,
         bdk_descriptor: Callable[
-            [bdk.DescriptorPublicKey, str, bdk.KeychainKind, bdk.Network],
+            [bdk.DescriptorPublicKey, str, bdk.KeychainKind, bdk.NetworkKind],
             bdk.Descriptor,
         ]
         | None = None,

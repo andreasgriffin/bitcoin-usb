@@ -1,6 +1,7 @@
 import logging
 
 import bdkpython as bdk
+from bitcoin_safe_lib.util import network_kind
 from mnemonic import Mnemonic
 
 from .address_types import SimplePubKeyProvider
@@ -36,7 +37,7 @@ def derive(mnemonic: str, key_origin: str, network: bdk.Network) -> tuple[str, s
         return s[:-2] if s.endswith("/*") else s
 
     bdk_mnemonic = bdk.Mnemonic.from_string(mnemonic)
-    root_secret_key = bdk.DescriptorSecretKey(network, bdk_mnemonic, "")
+    root_secret_key = bdk.DescriptorSecretKey(network_kind(network), bdk_mnemonic, "")
     fingerprint = root_secret_key.as_public().master_fingerprint()
     derived_secret = root_secret_key.derive(bdk.DerivationPath(key_origin))
 
