@@ -245,7 +245,9 @@ class USBGui(QObject):
 
         return None
 
-    def get_fingerprint_and_xpubs(self) -> tuple[dict[str, Any], str, dict[AddressType, str]] | None:
+    def get_fingerprint_and_xpubs(
+        self, account_index: int = 0
+    ) -> tuple[dict[str, Any], str, dict[AddressType, str]] | None:
         selected_device = self.get_device()
         if not selected_device:
             return None
@@ -253,7 +255,11 @@ class USBGui(QObject):
         try:
 
             def _collect_xpubs(device: USBDevice) -> tuple[dict[str, Any], str, dict[AddressType, str]]:
-                return (selected_device, device.get_fingerprint(), device.get_xpubs())
+                return (
+                    selected_device,
+                    device.get_fingerprint(),
+                    device.get_xpubs(account_index=account_index),
+                )
 
             return self._with_device(selected_device, _collect_xpubs)
         except Exception as e:

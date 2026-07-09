@@ -15,7 +15,8 @@ def test_get_fingerprint_and_xpubs_uses_worker_task_for_jade_ble(monkeypatch) ->
         def get_fingerprint(self) -> str:
             return "f00dbabe"
 
-        def get_xpubs(self) -> dict[str, str]:
+        def get_xpubs(self, account_index: int = 0) -> dict[str, str]:
+            assert account_index == 0
             return {}
 
     class _FakeContextDevice:
@@ -60,7 +61,8 @@ def test_get_fingerprint_and_xpubs_uses_worker_task_for_usb_on_linux(monkeypatch
         def get_fingerprint(self) -> str:
             return "f00dbabe"
 
-        def get_xpubs(self) -> dict[str, str]:
+        def get_xpubs(self, account_index: int = 0) -> dict[str, str]:
+            assert account_index == 0
             return {}
 
     class _FakeContextDevice:
@@ -104,7 +106,8 @@ def test_get_fingerprint_and_xpubs_runs_inline_for_usb_on_macos(monkeypatch) -> 
         def get_fingerprint(self) -> str:
             return "f00dbabe"
 
-        def get_xpubs(self) -> dict[str, str]:
+        def get_xpubs(self, account_index: int = 0) -> dict[str, str]:
+            assert account_index == 0
             return {}
 
     class _FakeContextDevice:
@@ -137,3 +140,40 @@ def test_bitbox02_usb_devices_run_in_worker_on_linux(monkeypatch) -> None:
     monkeypatch.setattr(usb_gui.platform, "system", lambda: "Linux")
 
     assert USBGui._should_run_in_worker(selected_device) is True
+
+
+def test_get_fingerprint_and_xpubs_forwards_account_index(monkeypatch) -> None:
+    gui = USBGui(network=bdk.Network.REGTEST, loop_in_thread=object())
+    selected_device = {"type": "trezor", "path": "usb:1"}
+    calls: dict[str, int] = {}
+
+    monkeypatch.setattr(gui, "get_device", lambda: selected_device)
+    monkeypatch.setattr(usb_gui.platform, "system", lambda: "Darwin")
+
+    class _FakeDevice:
+        def get_fingerprint(self) -> str:
+            return "f00dbabe"
+
+        def get_xpubs(self, account_index: int = 0) -> dict[str, str]:
+            calls["account_index"] = account_index
+            return {}
+
+    class _FakeContextDevice:
+        def __init__(self, *args, **kwargs):
+            _ = args
+            _ = kwargs
+
+        def __enter__(self):
+            return _FakeDevice()
+
+        def __exit__(self, exc_type, exc_value, traceback):
+            _ = exc_type
+            _ = exc_value
+            _ = traceback
+
+    monkeypatch.setattr(usb_gui, "USBDevice", _FakeContextDevice)
+
+    result = gui.get_fingerprint_and_xpubs(account_index=7)
+
+    assert result == (selected_device, "f00dbabe", {})
+    assert calls == {"account_index": 7}

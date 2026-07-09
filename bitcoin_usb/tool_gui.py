@@ -10,6 +10,7 @@ from PyQt6.QtWidgets import (
     QMainWindow,
     QMessageBox,
     QPushButton,
+    QSpinBox,
     QTabWidget,
     QTextEdit,
     QVBoxLayout,
@@ -54,6 +55,11 @@ class ToolGui(QMainWindow):
         # Tab 1: XPUBs
         xpubs_tab = QWidget()
         xpubs_layout = QVBoxLayout(xpubs_tab)
+        self.xpub_account_index_spin_box = QSpinBox(xpubs_tab)
+        self.xpub_account_index_spin_box.setMinimum(0)
+        self.xpub_account_index_spin_box.setValue(0)
+        self.xpub_account_index_spin_box.setPrefix(self.tr("Account index: "))
+        xpubs_layout.addWidget(self.xpub_account_index_spin_box)
         self.button = SpinningButton(
             text=self.tr("Get xpubs"),
             signal_stop_spinning=self.usb.signal_end_hwi_blocker,
@@ -198,7 +204,8 @@ class ToolGui(QMainWindow):
 
     def on_button_xpubs_clicked(self) -> None:
         self.xpubs_text_edit.setText("")
-        fingerprint_and_xpus = self.usb.get_fingerprint_and_xpubs()
+        account_index = self.xpub_account_index_spin_box.value()
+        fingerprint_and_xpus = self.usb.get_fingerprint_and_xpubs(account_index=account_index)
 
         if not fingerprint_and_xpus:
             return
@@ -207,7 +214,7 @@ class ToolGui(QMainWindow):
         if xpubs:
             txt = "\n".join(
                 [
-                    f"{str(k)}: [{k.key_origin(self.usb.network).replace('m/', f'{fingerprint}/')}]  {v}"
+                    f"{str(k)}: [{k.key_origin(self.usb.network, account_index).replace('m/', f'{fingerprint}/')}]  {v}"
                     for k, v in xpubs.items()
                 ]
             )
