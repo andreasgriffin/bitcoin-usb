@@ -1,6 +1,7 @@
 import logging
 
 import bdkpython as bdk
+from bitcoin_safe_lib.util import network_kind
 from hwilib.descriptor import parse_descriptor
 
 from .address_types import (
@@ -82,7 +83,7 @@ class SoftwareSigner(BaseDevice):
             return s[:-2] if s.endswith("/*") else s
 
         mnemonic = bdk.Mnemonic.from_string(mnemonic_str)
-        root_secret_key = bdk.DescriptorSecretKey(network, mnemonic, "")
+        root_secret_key = bdk.DescriptorSecretKey(network_kind(network), mnemonic, "")
         info = DescriptorInfo.from_str(descriptor_public)
 
         # bdk works with hardened_char="'" by default and we need to ensure descriptor_with_secret then also has hardened_char="'"
@@ -99,7 +100,7 @@ class SoftwareSigner(BaseDevice):
                     derived_pub_str, strip_derivation_path(str(derived_secret))
                 )
 
-        return bdk.Descriptor(descriptor=descriptor_with_secret, network=network)
+        return bdk.Descriptor(descriptor=descriptor_with_secret, network_kind=network_kind(network))
 
     def sign_psbt(self, psbt: bdk.Psbt) -> bdk.Psbt | None:
         previous_serialized = psbt.serialize()
