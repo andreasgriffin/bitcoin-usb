@@ -124,13 +124,11 @@ class DeviceDialog(QDialog):
         self.bluetooth_scan_button.setAutoDefault(False)
 
         self.install_udev_button = QPushButton(self.tr("Install udev rules"), self)
-        if not self.install_udev_callback and sys.platform.startswith("linux"):
-            self.install_udev_button.setHidden(True)
-        elif self.install_udev_callback:
-            self.install_udev_button.clicked.connect(self.install_udev_callback)
+        self.install_udev_button.setHidden(True)
+        if sys.platform.startswith("linux") and install_udev_callback is not None:
+            self.install_udev_button.clicked.connect(install_udev_callback)
         self.actions_bar.addButton(self.install_udev_button, QDialogButtonBox.ButtonRole.ActionRole)
         self.install_udev_button.setAutoDefault(False)
-        self.install_udev_button.setVisible(False)
 
         self.cancel_button = self.actions_bar.addButton(QDialogButtonBox.StandardButton.Cancel)
         self.actions_bar.rejected.connect(self.reject)
@@ -307,7 +305,12 @@ class DeviceDialog(QDialog):
     def _update_install_udev_button_visibility(self) -> None:
         if not self.install_udev_button:
             return
-        show_button = self._has_completed_usb_scan and self._usb_device_count() == 0
+        show_button = (
+            sys.platform.startswith("linux")
+            and self.install_udev_callback is not None
+            and self._has_completed_usb_scan
+            and self._usb_device_count() == 0
+        )
         self.install_udev_button.setVisible(show_button)
 
     def _empty_state_hint_text(self) -> str:
