@@ -5,6 +5,7 @@ from types import SimpleNamespace
 
 from PyQt6.QtCore import QCoreApplication
 
+from bitcoin_usb import dialogs
 from bitcoin_usb.device import DialogNoiseConfig, ThreadedCapturePrintDialogBitBox02
 from bitcoin_usb.dialogs import DeviceDialog
 
@@ -13,12 +14,16 @@ class _FakeButton:
     def __init__(self) -> None:
         self.default = False
         self.focused = False
+        self.visible = False
 
     def setDefault(self, value: bool) -> None:
         self.default = value
 
     def setFocus(self) -> None:
         self.focused = True
+
+    def setVisible(self, value: bool) -> None:
+        self.visible = value
 
 
 class _FakeItem:
@@ -191,6 +196,26 @@ def test_scan_callbacks_ignore_stale_tokens() -> None:
     DeviceDialog._on_scan_error(dialog, "usb", 1, RuntimeError("boom"))  # type: ignore[arg-type]
 
     assert calls == []
+
+
+def test_install_udev_button_is_only_visible_on_linux(monkeypatch) -> None:
+    button = _FakeButton()
+    dialog = SimpleNamespace(
+        install_udev_button=button,
+        install_udev_callback=lambda: None,
+        _has_completed_usb_scan=True,
+        _usb_device_count=lambda: 0,
+    )
+
+    monkeypatch.setattr(dialogs.sys, "platform", "darwin")
+    DeviceDialog._update_install_udev_button_visibility(dialog)  # type: ignore[arg-type]
+
+    assert button.visible is False
+
+    monkeypatch.setattr(dialogs.sys, "platform", "linux")
+    DeviceDialog._update_install_udev_button_visibility(dialog)  # type: ignore[arg-type]
+
+    assert button.visible is True
 
 
 def test_threaded_capture_print_dialog_run_func_emits_result() -> None:
