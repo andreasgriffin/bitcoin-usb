@@ -22,7 +22,7 @@ from PyQt6.QtWidgets import (
     QVBoxLayout,
 )
 
-from bitcoin_usb.util import get_icon_path
+from bitcoin_usb.util import svg_tools
 
 
 class AutoScanMode(Enum):
@@ -52,8 +52,8 @@ def get_message_box(
 
 
 class DeviceDialog(QDialog):
-    _usb_icon_path = get_icon_path("bi--usb-symbol.svg")
-    _bluetooth_icon_path = get_icon_path("bi--bluetooth.svg")
+    _usb_icon_name = "bi--usb-symbol.svg"
+    _bluetooth_icon_name = "bi--bluetooth.svg"
 
     def __init__(
         self,
@@ -88,8 +88,8 @@ class DeviceDialog(QDialog):
         self._has_auto_scanned_on_open = False
         self._has_completed_usb_scan = False
         self._scan_finished_message = ""
-        self.usb_icon = self._load_icon(self._usb_icon_path)
-        self.bluetooth_icon = self._load_icon(self._bluetooth_icon_path)
+        self.usb_icon = self._load_icon(self._usb_icon_name)
+        self.bluetooth_icon = self._load_icon(self._bluetooth_icon_name)
 
         self.instructions_label = QLabel(self)
         self.instructions_label.setWordWrap(True)
@@ -186,8 +186,8 @@ class DeviceDialog(QDialog):
         self.accept()
 
     @staticmethod
-    def _load_icon(icon_path: str) -> QIcon:
-        return QIcon(icon_path)
+    def _load_icon(icon_name: str) -> QIcon:
+        return svg_tools.get_QIcon(icon_name)
 
     def _transport_icon(self, transport: str) -> QIcon:
         if transport == "bluetooth":
