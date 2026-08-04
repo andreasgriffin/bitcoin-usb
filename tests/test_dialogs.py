@@ -45,6 +45,15 @@ class _FakeLayout:
         return _FakeItem(self._widgets[index])
 
 
+def test_load_icon_uses_theme_aware_svg_tools(monkeypatch) -> None:
+    expected_icon = object()
+    monkeypatch.setattr(dialogs.svg_tools, "get_QIcon", lambda icon_name: expected_icon)
+
+    icon = DeviceDialog._load_icon("bi--usb-symbol.svg")
+
+    assert icon is expected_icon
+
+
 def test_on_scan_finished_defaults_to_first_device_button(monkeypatch) -> None:
     monkeypatch.setattr("bitcoin_usb.dialogs.QPushButton", _FakeButton)
     usb_scan_button = _FakeButton()

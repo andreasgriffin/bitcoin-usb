@@ -7,6 +7,7 @@ from collections.abc import Callable
 from typing import TypeVar
 
 from bitcoin_safe_lib.async_tools.loop_in_thread import LoopInThread
+from bitcoin_safe_lib.gui.qt.icons import SvgTools
 from PyQt6.QtCore import QEventLoop
 
 logger = logging.getLogger(__name__)
@@ -85,3 +86,6 @@ def resource_path(*parts: str):
 def get_icon_path(icon_basename: str) -> str:
     """Get icon path."""
     return resource_path("icons", icon_basename)
+
+
+svg_tools = SvgTools(get_icon_path=get_icon_path, theme_file=None)
