@@ -435,6 +435,12 @@ class USBDevice(BaseDevice, QObject):
                 # the error appears even if the firmware was instralled successfully.
                 # So do not raise an exception
                 logger.error(f"{filepath} returned {error=}")
+                raise RuntimeError(
+                    self.tr(
+                        "The Trezor firmware update finished and the device rebooted. "
+                        "Please reconnect the device and try again."
+                    )
+                )
 
             if self.client and not trezor_features.initialized:
                 if question_dialog(
