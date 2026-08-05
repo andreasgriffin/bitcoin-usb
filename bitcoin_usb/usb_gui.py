@@ -14,6 +14,7 @@ from bitcoin_safe_lib.gui.qt.signal_tracker import SignalProtocol
 from bitcoin_safe_lib.gui.qt.util import question_dialog
 from bitcoin_safe_lib.util_os import xdg_open_file
 from bleak import BleakClient, BleakScanner
+from cbor2 import CBORDecodeEOF
 from hwilib.devices.bitbox02 import Bitbox02Client
 from PyQt6.QtCore import QObject, pyqtSignal
 from PyQt6.QtGui import QIcon
@@ -401,6 +402,11 @@ class USBGui(QObject):
         return True
 
     def handle_exception_display_address(self, exception: Exception) -> bool:
+        if isinstance(exception, CBORDecodeEOF) and str(exception) == (
+            "premature end of stream (expected to read 1 bytes, got 0 instead)"
+        ):
+            logger.warning("Jade address display response timed out: %s", exception)
+            return True
         self.show_error_message(str(exception))
         return True
 
