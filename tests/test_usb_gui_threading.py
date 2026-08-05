@@ -1,6 +1,9 @@
 from types import SimpleNamespace
 
+import logging
+
 import bdkpython as bdk
+from cbor2 import CBORDecodeEOF
 import pytest
 
 from bitcoin_usb.device import USBDevice
@@ -27,6 +30,18 @@ def test_usbdevice_enter_is_synchronous(monkeypatch) -> None:
     assert init_calls == ["called"]
 
 
+def test_usbdevice_exit_does_not_print_operation_exception(capsys) -> None:
+    device = USBDevice(
+        selected_device={"type": "jade", "path": "/dev/mock"},
+        network=bdk.Network.REGTEST,
+    )
+    device.lock.acquire()
+
+    device.__exit__(RuntimeError, RuntimeError("connection failed"), None)
+
+    assert capsys.readouterr().out == ""
+
+
 def test_usbdevice_run_wrapper_removed() -> None:
     assert not hasattr(USBDevice, "run")
 
@@ -41,6 +56,29 @@ def test_usbgui_with_device_exists() -> None:
 
 def test_usbgui_run_with_device_wrapper_removed() -> None:
     assert not hasattr(USBGui, "_run_with_device")
+
+
+def test_jade_display_timeout_is_logged_without_error_dialog(monkeypatch, caplog) -> None:
+    shown_errors: list[str] = []
+    gui = USBGui(network=bdk.Network.REGTEST, loop_in_thread=object())
+    monkeypatch.setattr(gui, "show_error_message", shown_errors.append)
+    exception = CBORDecodeEOF("premature end of stream (expected to read 1 bytes, got 0 instead)")
+
+    with caplog.at_level(logging.WARNING):
+        assert gui.handle_exception_display_address(exception)
+
+    assert shown_errors == []
+    assert "Jade address display response timed out" in caplog.text
+
+
+def test_other_display_errors_still_show_error_dialog(monkeypatch) -> None:
+    shown_errors: list[str] = []
+    gui = USBGui(network=bdk.Network.REGTEST, loop_in_thread=object())
+    monkeypatch.setattr(gui, "show_error_message", shown_errors.append)
+
+    assert gui.handle_exception_display_address(RuntimeError("connection failed"))
+
+    assert shown_errors == ["connection failed"]
 
 
 def test_trezor_firmware_update_stops_initialization_after_reboot(monkeypatch) -> None:

@@ -483,7 +483,7 @@ class USBDevice(BaseDevice, QObject):
         self.lock.release()
         # Handle exceptions if necessary
         if exc_type is not None:
-            print(f"An exception occurred: {exc_value}")
+            logger.debug("Device operation failed: %s", exc_value)
 
     def wipe_device(self) -> bool:
         assert self.client
