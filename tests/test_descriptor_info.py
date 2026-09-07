@@ -142,15 +142,19 @@ def test_wsh_multisig():
     assert info.address_type.short_name == "p2wsh"
     assert len(info.spk_providers) == 3
 
+    # The original bitcoin-core HWI keeps sortedmulti pubkeys in the order they
+    # appear in the descriptor (is_sorted=True); the actual sorting happens at
+    # derivation time, not at parse time. So spk_providers follow the input
+    # order of the descriptor: 45f35351, 829074ff, d5b43540.
     assert info.spk_providers[0].__dict__ == {
-        "xpub": "tpubDDx9arPwEvHGnnkKN1YJXFE4W6JZXyVX9HGjZW75nWe1FCsTYu2k3i7VtCwhGR9zj6UUYnseZUnwL7T6Znru3NmXkcjEQxMqRx7Rxz8rPp4",
-        "fingerprint": "829074FF",
+        "xpub": "tpubDEY3tNWvDs8J6xAmwoirxgff61gPN1V6U5numeb6xjvZRB883NPPpRYHt2A6fUE3YyzDLezFfuosBdXsdXJhJUcpqYWF9EEBmWqG3rG8sdy",
+        "fingerprint": "45F35351",
         "key_origin": "m/48h/1h/0h/2h",
         "derivation_path": "/<0;1>/*",
     }
     assert info.spk_providers[1].__dict__ == {
-        "xpub": "tpubDEY3tNWvDs8J6xAmwoirxgff61gPN1V6U5numeb6xjvZRB883NPPpRYHt2A6fUE3YyzDLezFfuosBdXsdXJhJUcpqYWF9EEBmWqG3rG8sdy",
-        "fingerprint": "45F35351",
+        "xpub": "tpubDDx9arPwEvHGnnkKN1YJXFE4W6JZXyVX9HGjZW75nWe1FCsTYu2k3i7VtCwhGR9zj6UUYnseZUnwL7T6Znru3NmXkcjEQxMqRx7Rxz8rPp4",
+        "fingerprint": "829074FF",
         "key_origin": "m/48h/1h/0h/2h",
         "derivation_path": "/<0;1>/*",
     }

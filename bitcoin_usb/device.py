@@ -544,4 +544,4 @@ class USBDevice(BaseDevice, QObject):
                 ),
             )
         else:
-            return hwi_commands.displayaddress(self.client, desc=address_descriptor)["address"]
+            return str(hwi_commands.displayaddress(self.client, desc=address_descriptor)["address"])
