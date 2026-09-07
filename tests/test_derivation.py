@@ -9,6 +9,7 @@ from bitcoin_usb.address_types import (
     logging,
 )
 from bitcoin_usb.seed_tools import derive_spk_provider
+from bitcoin_safe_lib.util import network_kind
 
 # test seeds
 # seed1: spider manual inform reject arch raccoon betray moon document across main build
@@ -32,9 +33,9 @@ def test_compare_single_sig_key_derivation_with_bdk_templates():
 
             assert address_type.bdk_descriptor_secret
             descriptor = address_type.bdk_descriptor_secret(
-                bdk.DescriptorSecretKey(network, bdk.Mnemonic.from_string(test_seed), ""),
+                bdk.DescriptorSecretKey(network_kind(network), bdk.Mnemonic.from_string(test_seed), ""),
                 bdk.KeychainKind.EXTERNAL,
-                network,
+                network_kind(network),
             )
 
             spk_provider = derive_spk_provider(test_seed, address_type.key_origin(network), network)
