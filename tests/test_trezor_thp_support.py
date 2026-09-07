@@ -177,15 +177,17 @@ def test_trezor_thp_sign_tx_reuses_hwi_sign_tx(monkeypatch) -> None:
     client._wallet_session = lambda: FakeSessionContext()  # type: ignore[method-assign]
     captured: dict[str, object] = {}
 
-    def fake_sign_tx(adapter, psbt):
+    def fake_sign_tx(adapter, psbt, registered_descriptors=None):
         captured["adapter"] = adapter
         captured["psbt"] = psbt
+        captured["registered_descriptors"] = registered_descriptors
         return "signed"
 
     monkeypatch.setattr("bitcoin_usb.trezor_thp.HwiTrezorClient.sign_tx", fake_sign_tx)
 
     assert client.sign_tx("psbt") == "signed"
     assert captured["psbt"] == "psbt"
+    assert captured["registered_descriptors"] is None
     assert cast(Any, captured["adapter"]).client._session is fake_session
 
 

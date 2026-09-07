@@ -7,6 +7,13 @@ ignore_missing_imports = true
 show_error_codes = true 
 disable_error_code = "assignment"
 
+[tool.pyright]
+# Point pyright at the in-project poetry venv (poetry.toml sets in-project=true)
+# so imports resolve consistently in CI, editors, and the pre-commit hook,
+# regardless of whether the venv is activated.
+venvPath = "."
+venv = ".venv"
+
 
 
 [tool.poetry]

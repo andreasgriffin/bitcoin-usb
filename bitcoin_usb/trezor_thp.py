@@ -9,7 +9,7 @@ import hwilib.devices.trezorlib.messages as hwi_messages
 import hwilib.devices.trezorlib.protobuf as hwi_protobuf
 import trezorlib.protobuf as trezorlib_protobuf
 from hwilib.common import AddressType, Chain
-from hwilib.descriptor import MultisigDescriptor
+from hwilib.descriptor import MultisigDescriptor, RegisteredDescriptor
 from hwilib.devices.trezor import TrezorClient as HwiTrezorClient
 from hwilib.errors import (
     ActionCanceledError,
@@ -333,9 +333,11 @@ class TrezorThpClient(HardwareWalletClient):
         with self._wallet_session() as session:
             return HwiTrezorClient.get_pubkey_at_path(_HwiTrezorSessionAdapter(self, session), bip32_path)
 
-    def sign_tx(self, psbt: PSBT) -> PSBT:
+    def sign_tx(self, psbt: PSBT, registered_descriptors: set[RegisteredDescriptor] | None = None) -> PSBT:
         with self._wallet_session() as session:
-            return HwiTrezorClient.sign_tx(_HwiTrezorSessionAdapter(self, session), psbt)
+            return HwiTrezorClient.sign_tx(
+                _HwiTrezorSessionAdapter(self, session), psbt, registered_descriptors
+            )
 
     def sign_message(self, message: str | bytes, bip32_path: str) -> str:
         with self._wallet_session() as session:
