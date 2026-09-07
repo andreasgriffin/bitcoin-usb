@@ -19,6 +19,7 @@ from hwilib.key import (
     ExtendedKey,
     KeyOriginInfo,
     is_hardened,
+    multipath_to_string,
     parse_path,
 )
 
@@ -405,18 +406,32 @@ class SimplePubKeyProvider:
             xpub=pubkey_provider.pubkey,
             fingerprint=fingerprint,
             key_origin=key_origin,
-            derivation_path=pubkey_provider.deriv_path
-            if pubkey_provider.deriv_path
-            else ConstDerivationPaths.receive,
+            derivation_path=cls._hwi_deriv_path_to_str(pubkey_provider),
         )
 
+    @staticmethod
+    def _hwi_deriv_path_to_str(pubkey_provider: PubkeyProvider) -> str:
+        deriv_path = pubkey_provider.deriv_path
+        if not deriv_path:
+            return ConstDerivationPaths.receive
+        if isinstance(deriv_path, str):
+            # Older/forked HWI versions store deriv_path as a string incl. "/*".
+            return deriv_path
+        # The original bitcoin-core HWI stores deriv_path as a ``List[List[int]]``
+        # (BIP389 multipath) and tracks the trailing "/*" range wildcard
+        # separately via ``ranged``.
+        path_str = multipath_to_string(deriv_path, hardened_char="h")
+        if pubkey_provider.ranged:
+            path_str += "/*"
+        return path_str
+
     def to_hwi_pubkey_provider(self) -> PubkeyProvider:
-        provider = PubkeyProvider(
-            origin=KeyOriginInfo.from_string(self.key_origin.replace("m", f"{self.fingerprint}")),
-            pubkey=self.xpub,
-            deriv_path=self.derivation_path,
+        # Let HWI parse the full key expression so multipath/ranged/hardening
+        # handling stays consistent with the library's own expectations.
+        origin_str = KeyOriginInfo.from_string(self.key_origin.replace("m", f"{self.fingerprint}")).to_string(
+            "h"
         )
-        return provider
+        return PubkeyProvider.parse(f"[{origin_str}]{self.xpub}{self.derivation_path}", 0)
 
     def __repr__(self) -> str:
         return f"{self.__class__.__name__}({self.__dict__})"

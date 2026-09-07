@@ -205,3 +205,38 @@ def test_unsupported_type2():
 
     # Compare the exception message
     assert exception_message == "Can only have sh() at top level"
+
+
+def test_from_hwi_deriv_path_as_int_list_regression():
+    # Regression for the bug introduced when switching to the original
+    # bitcoin-core HWI: ``PubkeyProvider.deriv_path`` is now a
+    # ``List[List[int]]`` (BIP389 multipath) with the ``/*`` range tracked
+    # separately via ``ranged``, instead of a plain string. Loading a wallet
+    # must not crash with ``AttributeError: 'list' object has no attribute
+    # 'replace'``.
+    xpub = "tpubDCX7cUd5o2ZzNVwxmM6s9XCXsDzWwybZG7QkMAUHfcDkVjeGg9qdT1U8ms1qjFHCHfv6AZ3LyEUtw6r9jYhjnuH3Znqb9RcEfEjbNcVpE6n"
+
+    cases = [
+        (
+            "wpkh([b0c08f62/84'/1'/0']" + xpub + "/<0;1>/*)#m26udjf3",
+            "/<0;1>/*",
+        ),
+        (
+            "wpkh([b0c08f62/84'/1'/0']" + xpub + "/0/*)",
+            "/0/*",
+        ),
+        (
+            "wpkh([b0c08f62/84'/1'/0']" + xpub + "/1/*)",
+            "/1/*",
+        ),
+    ]
+
+    for descriptor_str, expected_derivation_path in cases:
+        info = DescriptorInfo.from_str(descriptor_str)
+        provider = info.spk_providers[0]
+        assert provider.derivation_path == expected_derivation_path, descriptor_str
+
+        # round-trip back to an HWI PubkeyProvider and serialize; the descriptor
+        # expression must reproduce the original derivation path.
+        hwi_provider = provider.to_hwi_pubkey_provider()
+        assert hwi_provider.to_string().endswith(expected_derivation_path), descriptor_str
