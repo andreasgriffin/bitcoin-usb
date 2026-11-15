@@ -34,22 +34,30 @@ _PURPOSE_TO_ADDRESS_TYPE: dict[int, AddressType] = {
 }
 
 
-def _address_type_from_bip32_path(bip32_path: str) -> AddressType:
-    """Return the single-sig address type from the BIP32 purpose level, e.g. m/84h/1h/0h/0/0."""
+def _address_type_from_bip32_path(bip32_path: str) -> AddressType | None:
+    """Return the single-sig address type from the BIP32 purpose level, e.g. m/84h/1h/0h/0/0.
+
+    Returns None for paths without a recognized single-sig purpose (e.g. BIP48 multisig).
+    """
     levels = [level for level in bip32_path.split("/") if level and level != "m"]
+    if not levels:
+        return None
     purpose = int(levels[0].rstrip("'hH"))
-    address_type = _PURPOSE_TO_ADDRESS_TYPE.get(purpose)
-    if address_type is None:
-        raise ValueError(f"Unsupported purpose for message signing: {bip32_path}")
-    return address_type
+    return _PURPOSE_TO_ADDRESS_TYPE.get(purpose)
 
 
-def _address_for(pub_key: PubKeyData, address_type: AddressType) -> str:
-    if address_type == AddressTypes.p2pkh:
-        return p2pkh(pub_key)
+def _message_address_for(pub_key: PubKeyData, bip32_path: str) -> str:
+    """Return the address that selects the message-signature format for the key at bip32_path.
+
+    Unrecognized purposes fall back to the legacy compressed P2PKH format. The signature then
+    proves possession of this individual key only, not control of any multisig address.
+    """
+    address_type = _address_type_from_bip32_path(bip32_path)
     if address_type == AddressTypes.p2sh_p2wpkh:
         return p2wpkh_p2sh(pub_key)
-    return p2wpkh(pub_key)
+    if address_type == AddressTypes.p2wpkh:
+        return p2wpkh(pub_key)
+    return p2pkh(pub_key)
 
 
 class SoftwareSigner(BaseDevice):
@@ -148,10 +156,20 @@ class SoftwareSigner(BaseDevice):
         return psbt
 
     def sign_message(self, message: str, bip32_path: str) -> str:
-        """Sign a BIP137 message with the key at bip32_path.
+        """Sign a message with the private key at the given BIP32 path.
 
-        Returns the base64 encoded 65 byte compact recoverable signature, in the same
-        format the hardware devices return.
+        The key is derived from the path regardless of its purpose. The message format depends on
+        the purpose:
+        - BIP44: legacy P2PKH signature (BIP137 header 31-34)
+        - BIP49: nested SegWit P2SH-P2WPKH BIP137 signature (header 35-38)
+        - BIP84: native SegWit P2WPKH BIP137 signature (header 39-42)
+        - any other valid path, e.g. BIP48 multisig: legacy compressed P2PKH signature (header 31-34)
+
+        For multisig paths (e.g. m/48h/1h/0h/2h/0/4) the signature proves possession of the individual
+        cosigner's key, NOT control of the multisig address. No BIP322 multisig message signing is
+        provided.
+
+        Returns the base64 encoded 65 byte compact recoverable signature.
         """
         mnemonic = bdk.Mnemonic.from_string(self.mnemonic)
         root_secret_key = bdk.DescriptorSecretKey(network_kind(self.network), mnemonic, "")
@@ -160,7 +178,7 @@ class SoftwareSigner(BaseDevice):
 
         btclib_network = _BTCLIB_NETWORK_NAMES[self.network]
         prv_key = PrvKeyData(int.from_bytes(secret, "big"), btclib_network, compressed=True)
-        address = _address_for(prv_key.pub, _address_type_from_bip32_path(bip32_path))
+        address = _message_address_for(prv_key.pub, bip32_path)
 
         # the address selects the BIP137 header range: P2PKH 31-34, P2SH-P2WPKH 35-38, P2WPKH 39-42
         signature = sign(message.encode("utf-8").hex(), prv_key, address)
