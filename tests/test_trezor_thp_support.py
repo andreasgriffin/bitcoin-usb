@@ -114,7 +114,7 @@ def test_modern_trezor_devices_can_be_forced_inline(monkeypatch) -> None:
 
 
 def test_trezor_prompt_requests_use_main_thread(monkeypatch) -> None:
-    app = QCoreApplication.instance()
+    app: QCoreApplication | None = QCoreApplication.instance()
     if app is None:
         app = QCoreApplication([])
 

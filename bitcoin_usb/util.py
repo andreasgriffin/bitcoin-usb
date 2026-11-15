@@ -4,16 +4,12 @@ import os
 import subprocess
 import sys
 from collections.abc import Callable
-from typing import TypeVar
 
 from bitcoin_safe_lib.async_tools.loop_in_thread import LoopInThread
 from bitcoin_safe_lib.gui.qt.icons import SvgTools
 from PyQt6.QtCore import QEventLoop
 
 logger = logging.getLogger(__name__)
-
-
-T = TypeVar("T")
 
 
 def run_script(script_name, args: list[str]):
@@ -37,7 +33,7 @@ def run_script(script_name, args: list[str]):
     return stdout, stderr
 
 
-def run_device_task(loop_in_thread: LoopInThread | None, task: Callable[[], T]) -> T | None:
+def run_device_task[T](loop_in_thread: LoopInThread | None, task: Callable[[], T]) -> T | None:
     if not loop_in_thread:
         return task()
 

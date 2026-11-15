@@ -2,6 +2,10 @@ import logging
 
 import bdkpython as bdk
 from bitcoin_safe_lib.util import network_kind
+from btclib.b32 import p2wpkh
+from btclib.b58 import p2pkh, p2wpkh_p2sh
+from btclib.bms import sign
+from btclib.key import PrvKeyData, PubKeyData
 from hwilib.descriptor import parse_descriptor
 
 from .address_types import (
@@ -14,6 +18,38 @@ from .device import BaseDevice
 from .seed_tools import derive
 
 logger = logging.getLogger(__name__)
+
+_BTCLIB_NETWORK_NAMES: dict[bdk.Network, str] = {
+    bdk.Network.BITCOIN: "mainnet",
+    bdk.Network.TESTNET: "testnet",
+    bdk.Network.TESTNET4: "testnet4",
+    bdk.Network.SIGNET: "signet",
+    bdk.Network.REGTEST: "regtest",
+}
+
+_PURPOSE_TO_ADDRESS_TYPE: dict[int, AddressType] = {
+    44: AddressTypes.p2pkh,
+    49: AddressTypes.p2sh_p2wpkh,
+    84: AddressTypes.p2wpkh,
+}
+
+
+def _address_type_from_bip32_path(bip32_path: str) -> AddressType:
+    """Return the single-sig address type from the BIP32 purpose level, e.g. m/84h/1h/0h/0/0."""
+    levels = [level for level in bip32_path.split("/") if level and level != "m"]
+    purpose = int(levels[0].rstrip("'hH"))
+    address_type = _PURPOSE_TO_ADDRESS_TYPE.get(purpose)
+    if address_type is None:
+        raise ValueError(f"Unsupported purpose for message signing: {bip32_path}")
+    return address_type
+
+
+def _address_for(pub_key: PubKeyData, address_type: AddressType) -> str:
+    if address_type == AddressTypes.p2pkh:
+        return p2pkh(pub_key)
+    if address_type == AddressTypes.p2sh_p2wpkh:
+        return p2wpkh_p2sh(pub_key)
+    return p2wpkh(pub_key)
 
 
 class SoftwareSigner(BaseDevice):
@@ -112,7 +148,23 @@ class SoftwareSigner(BaseDevice):
         return psbt
 
     def sign_message(self, message: str, bip32_path: str) -> str:
-        raise NotImplementedError("")
+        """Sign a BIP137 message with the key at bip32_path.
+
+        Returns the base64 encoded 65 byte compact recoverable signature, in the same
+        format the hardware devices return.
+        """
+        mnemonic = bdk.Mnemonic.from_string(self.mnemonic)
+        root_secret_key = bdk.DescriptorSecretKey(network_kind(self.network), mnemonic, "")
+        derived_secret = root_secret_key.derive(bdk.DerivationPath(bip32_path))
+        secret = bytes(derived_secret.secret_bytes())
+
+        btclib_network = _BTCLIB_NETWORK_NAMES[self.network]
+        prv_key = PrvKeyData(int.from_bytes(secret, "big"), btclib_network, compressed=True)
+        address = _address_for(prv_key.pub, _address_type_from_bip32_path(bip32_path))
+
+        # the address selects the BIP137 header range: P2PKH 31-34, P2SH-P2WPKH 35-38, P2WPKH 39-42
+        signature = sign(message.encode("utf-8").hex(), prv_key, address)
+        return signature.b64encode()
 
     def display_address(
         self,

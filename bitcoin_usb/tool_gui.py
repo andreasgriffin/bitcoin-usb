@@ -151,7 +151,7 @@ class ToolGui(QMainWindow):
         if platform.system() == "Linux":
             udev_tab = QWidget()
             udev_tab_layout = QVBoxLayout(udev_tab)
-            self.udev_button = QPushButton(text=self.tr("Install udev rules"), parent=udev_tab)
+            self.udev_button = QPushButton(self.tr("Install udev rules"), udev_tab)
             self.udev_button.clicked.connect(self.install_udev)
             udev_tab_layout.addWidget(self.udev_button)
             tab_widget.addTab(udev_tab, ("udev"))

@@ -241,7 +241,7 @@ class CompatibleJadeBleImpl(BlockstreamJadeBleImpl):
     ) -> Any:
         try:
             return await asyncio.wait_for(operation, timeout=timeout_seconds)
-        except asyncio.TimeoutError as e:
+        except TimeoutError as e:
             raise JadeError(
                 2,
                 f"BLE operation timed out: {operation_name}",

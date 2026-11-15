@@ -90,7 +90,7 @@ class USBMultisigRegisteringNotSupported(Exception):
 
 
 class USBGui(QObject):
-    signal_end_hwi_blocker = cast(SignalProtocol[[]], pyqtSignal())
+    signal_end_hwi_blocker = cast(SignalProtocol[[]], pyqtSignal())  # type: ignore[call-arg]
 
     def __init__(
         self,

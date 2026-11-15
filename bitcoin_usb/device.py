@@ -4,11 +4,12 @@ from abc import abstractmethod
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import bdkpython as bdk
 import hwilib.commands as hwi_commands
 from bitcoin_safe_lib.async_tools.loop_in_thread import LoopInThread
+from bitcoin_safe_lib.gui.qt.signal_tracker import SignalProtocol
 from hwilib.common import Chain
 from hwilib.devices.bitbox02 import Bitbox02Client, CLINoiseConfig
 from hwilib.devices.bitbox02_lib import bitbox02
@@ -64,8 +65,8 @@ class _PairingRequest:
 
 
 class _ThreadedDialogBridge(QObject):
-    finished = pyqtSignal(object)
-    error = pyqtSignal(object)
+    finished = cast(SignalProtocol[[object]], pyqtSignal(object))  # type: ignore[call-arg]
+    error = cast(SignalProtocol[[object]], pyqtSignal(object))  # type: ignore[call-arg]
 
 
 class _MainThreadBitBox02PairingPrompt(QObject):
@@ -99,7 +100,7 @@ def _get_main_thread_bitbox02_pairing_prompt() -> _MainThreadBitBox02PairingProm
     global _MAIN_THREAD_BITBOX02_PAIRING_PROMPT
     if _MAIN_THREAD_BITBOX02_PAIRING_PROMPT is None or sip.isdeleted(_MAIN_THREAD_BITBOX02_PAIRING_PROMPT):
         _MAIN_THREAD_BITBOX02_PAIRING_PROMPT = _MainThreadBitBox02PairingPrompt()
-        app = QCoreApplication.instance()
+        app: QCoreApplication | None = QCoreApplication.instance()
         if app is not None:
             _MAIN_THREAD_BITBOX02_PAIRING_PROMPT.moveToThread(app.thread())
     return _MAIN_THREAD_BITBOX02_PAIRING_PROMPT
@@ -150,7 +151,7 @@ def question_dialog(
 
 
 class ThreadedCapturePrintDialogBitBox02(QDialog):
-    print_message = pyqtSignal(str)
+    print_message = cast(SignalProtocol[[str]], pyqtSignal(str))  # type: ignore[call-arg]
 
     def __init__(self, func, *args, title="Processing...", message="", **kwargs):
         super().__init__()
@@ -168,7 +169,7 @@ class ThreadedCapturePrintDialogBitBox02(QDialog):
         self._thread: threading.Thread | None = None
         self._worker_error: BaseException | None = None
         self.func_result = False
-        self._bridge = _ThreadedDialogBridge(self)
+        self._bridge = _ThreadedDialogBridge()
         self._bridge.finished.connect(self.handle_func_result)
         self._bridge.error.connect(self.handle_func_error)
 
@@ -293,7 +294,7 @@ class DialogNoiseConfig(CLINoiseConfig):
     """Noise pairing and attestation check handling in the terminal (stdin/stdout)"""
 
     def show_pairing(self, code: str, device_response: Callable[[], bool]) -> bool:
-        app = QCoreApplication.instance()
+        app: QCoreApplication | None = QCoreApplication.instance()
         if app is None or QThread.currentThread() is app.thread():
             self.threaded_dialog = ThreadedCapturePrintDialogBitBox02(
                 func=device_response,
