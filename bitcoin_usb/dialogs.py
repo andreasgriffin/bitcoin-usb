@@ -253,7 +253,8 @@ class DeviceDialog(QDialog):
             widget = item.widget()
             if widget:
                 widget.setHidden(True)
-                widget.setParent(None)
+                # Qt accepts None to detach the widget; the PyQt6 stubs omit that overload
+                widget.setParent(None)  # type: ignore[call-overload]
 
         devices = list(self._devices_by_key.values())
         devices.sort(

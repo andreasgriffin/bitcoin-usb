@@ -26,7 +26,7 @@ description = "Wrapper around hwi, such that one can sign bdk PSBTs directly"
 homepage = "https://github.com/andreasgriffin/bitcoin-usb"
 
 [tool.poetry.dependencies]
-python = ">=3.10,<3.14"
+python = ">=3.12,<3.14"
 hwi =  { git = "https://github.com/bitcoin-core/HWI.git", branch = "master" } 
 pyqt6 = "^6.6.1"
 mnemonic = "^0.21"
@@ -36,6 +36,7 @@ bitcoin-safe-lib = {  git = "https://github.com/andreasgriffin/bitcoin-safe-lib.
 bleak = "^0.22.3"
 jade-client = {git = "https://github.com/Blockstream/Jade.git", rev = "fb2642397ed7afdda08f3d1380ac6ee21164e7e6"}
 aioitertools = "^0.13.0"  #  needed for jade-client
+btclib = "^2026.11.14"
 
 [tool.poetry.group.dev.dependencies]
 pytest = ">=8.2.2"
@@ -49,7 +50,7 @@ build-backend = "poetry.core.masonry.api"
 
 
 [tool.ruff]
-target-version = "py310"
+target-version = "py312"
 line-length = 110
 src = ["bitcoin_usb"]
 

@@ -1,7 +1,7 @@
 repos:
 
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.13.1  
+    rev: v0.17.5  
     hooks:
       # Lint + auto-fix (includes import sorting, unused imports, etc.)
       - id: ruff-format
@@ -13,7 +13,7 @@ repos:
 
 
   - repo: https://github.com/pre-commit/mirrors-mypy
-    rev: v1.11.2   # Use the latest MyPy version
+    rev: v2.4.1   # Use the latest MyPy version
     hooks:
       - id: mypy
         # exclude: '^(tests/|build/.+)'      

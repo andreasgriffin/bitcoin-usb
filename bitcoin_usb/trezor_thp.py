@@ -74,7 +74,7 @@ def _get_main_thread_text_prompt() -> _MainThreadTextPrompt:
     global _MAIN_THREAD_TEXT_PROMPT
     if _MAIN_THREAD_TEXT_PROMPT is None or sip.isdeleted(_MAIN_THREAD_TEXT_PROMPT):
         _MAIN_THREAD_TEXT_PROMPT = _MainThreadTextPrompt()
-        app = QCoreApplication.instance()
+        app: QCoreApplication | None = QCoreApplication.instance()
         if app is not None:
             _MAIN_THREAD_TEXT_PROMPT.moveToThread(app.thread())
     return _MAIN_THREAD_TEXT_PROMPT
@@ -156,7 +156,7 @@ def _show_text_dialog(title: str, label: str, echo: QLineEdit.EchoMode = QLineEd
 
 
 def _request_text(title: str, label: str, echo: QLineEdit.EchoMode = QLineEdit.EchoMode.Normal) -> str:
-    app = QCoreApplication.instance()
+    app: QCoreApplication | None = QCoreApplication.instance()
     if app is None or QThread.currentThread() is app.thread():
         return _show_text_dialog(title, label, echo)
 

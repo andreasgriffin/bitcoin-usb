@@ -294,7 +294,7 @@ def test_threaded_capture_print_dialog_handle_error_closes_dialog() -> None:
 
 
 def test_bitbox02_pairing_requests_use_main_thread(monkeypatch) -> None:
-    app = QCoreApplication.instance()
+    app: QCoreApplication | None = QCoreApplication.instance()
     if app is None:
         app = QCoreApplication([])
 
