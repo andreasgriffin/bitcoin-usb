@@ -27,6 +27,7 @@ homepage = "https://github.com/andreasgriffin/bitcoin-usb"
 
 [tool.poetry.dependencies]
 python = ">=3.12,<3.14"
+bdkpython = "^3.2.0"
 hwi =  { git = "https://github.com/bitcoin-core/HWI.git", branch = "master" } 
 pyqt6 = "^6.6.1"
 mnemonic = "^0.21"

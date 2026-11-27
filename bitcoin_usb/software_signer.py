@@ -1,4 +1,5 @@
 import logging
+from typing import cast
 
 import bdkpython as bdk
 from bitcoin_safe_lib.util import network_kind
@@ -71,20 +72,18 @@ class SoftwareSigner(BaseDevice):
         super().__init__(network=network)
         self.mnemonic = mnemonic
 
-        self.wallet = bdk.Wallet(
-            descriptor=self._bdk_descriptor_with_secrets(
+        self.descriptors = [
+            self._bdk_descriptor_with_secrets(
                 descriptor_public=receive_descriptor,
                 mnemonic_str=mnemonic,
                 network=network,
             ),
-            change_descriptor=self._bdk_descriptor_with_secrets(
+            self._bdk_descriptor_with_secrets(
                 descriptor_public=change_descriptor,
                 mnemonic_str=mnemonic,
                 network=network,
             ),
-            network=self.network,
-            persister=bdk.Persister.new_in_memory(),
-        )
+        ]
 
     def derive(self, key_origin: str):
         xpub, fingerprint = derive(self.mnemonic, key_origin, self.network)
@@ -147,13 +146,15 @@ class SoftwareSigner(BaseDevice):
         return bdk.Descriptor(descriptor=descriptor_with_secret, network_kind=network_kind(network))
 
     def sign_psbt(self, psbt: bdk.Psbt) -> bdk.Psbt | None:
-        previous_serialized = psbt.serialize()
-        fully_signed = self.wallet.sign(psbt=psbt, sign_options=None)
-        if fully_signed:
-            return psbt
-        if psbt.serialize() == previous_serialized:
+        try:
+            result = psbt.sign(self.descriptors)
+        except bdk.PsbtSignError.NoSecretKeys:
             return None
-        return psbt
+        if result.errors:
+            raise cast(Exception, next(iter(result.errors.values())))
+        if not result.signed_inputs:
+            return None
+        return psbt.finalize().psbt
 
     def sign_message(self, message: str, bip32_path: str) -> str:
         """Sign a message with the private key at the given BIP32 path.
